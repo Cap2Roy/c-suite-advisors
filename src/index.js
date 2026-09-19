@@ -1,11 +1,11 @@
 // Express Server — C-Suite Advisors API
-// Provides chat, task, data, workflow, report, and messaging endpoints.
+// Provides chat, task, data, workflow, report, messaging, settings, and memory endpoints.
 
 import express from "express";
 import multer from "multer";
 import { agents, getAgentById } from "./agents/definitions.js";
 import { runTask, getAllTasks } from "./services/taskRunner.js";
-import { complete, isLLMConfigured } from "./services/llmClient.js";
+import { complete, isLLMConfigured, getLLMModel } from "./services/llmClient.js";
 import {
   addFile,
   listFiles,
@@ -18,6 +18,20 @@ import {
 import { sendMessage, runDiscussion, MessageType } from "./services/orchestrator.js";
 import { generateReport, formatReportAsMarkdown } from "./services/reportGenerator.js";
 import { workflows, executeWorkflow } from "./services/workflows.js";
+import {
+  getSettings,
+  updateSettings,
+} from "./services/settingsStore.js";
+import {
+  getSharedMemory,
+  addSharedMemory,
+  deleteSharedMemory,
+  getPersonalMemory,
+  addPersonalMemory,
+  deletePersonalMemory,
+  buildMemoryContext,
+  getMemoryStats,
+} from "./services/memoryStore.js";
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
@@ -31,11 +45,79 @@ const upload = multer({
 // Serve static files
 app.use(express.static("public"));
 
+// --- Settings Routes ---
+
+// Get current LLM settings (API key masked)
+app.get("/api/settings", (req, res) => {
+  res.json(getSettings());
+});
+
+// Update LLM settings
+app.post("/api/settings", (req, res) => {
+  const { apiKey, apiBase, model } = req.body;
+  const updated = updateSettings({ apiKey, apiBase, model });
+  res.json({
+    ok: true,
+    hasKey: Boolean(updated.apiKey),
+    apiBase: updated.apiBase,
+    model: updated.model,
+    maskedKey: updated.apiKey
+      ? `${updated.apiKey.slice(0, 4)}...${updated.apiKey.slice(-4)}`
+      : "",
+  });
+});
+
+// --- Memory Routes ---
+
+// Get all shared memory
+app.get("/api/memory/shared", (req, res) => {
+  res.json(getSharedMemory());
+});
+
+// Add shared memory
+app.post("/api/memory/shared", (req, res) => {
+  const { content, createdBy } = req.body;
+  if (!content) return res.status(400).json({ error: "content is required" });
+  res.json(addSharedMemory(content, createdBy));
+});
+
+// Delete shared memory
+app.delete("/api/memory/shared/:id", (req, res) => {
+  const ok = deleteSharedMemory(req.params.id);
+  if (!ok) return res.status(404).json({ error: "Memory entry not found" });
+  res.json({ ok: true });
+});
+
+// Get personal memory for an advisor
+app.get("/api/memory/personal/:agentId", (req, res) => {
+  res.json(getPersonalMemory(req.params.agentId));
+});
+
+// Add personal memory for an advisor
+app.post("/api/memory/personal/:agentId", (req, res) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: "content is required" });
+  res.json(addPersonalMemory(req.params.agentId, content));
+});
+
+// Delete personal memory
+app.delete("/api/memory/personal/:agentId/:id", (req, res) => {
+  const ok = deletePersonalMemory(req.params.agentId, req.params.id);
+  if (!ok) return res.status(404).json({ error: "Memory entry not found" });
+  res.json({ ok: true });
+});
+
+// Get memory stats
+app.get("/api/memory/stats", (req, res) => {
+  res.json(getMemoryStats());
+});
+
 // --- Data Repository Routes ---
 
-// List all files in the knowledge base
+// List all files (optionally filter by agentId)
 app.get("/api/data", (req, res) => {
-  res.json(listFiles());
+  const { agentId } = req.query;
+  res.json(listFiles(agentId !== undefined ? agentId : undefined));
 });
 
 // Get a single file with content
@@ -49,14 +131,13 @@ app.get("/api/data/:id", (req, res) => {
 app.post("/api/data", upload.single("file"), async (req, res) => {
   try {
     let originalName, content, mimeType;
+    const agentId = req.body.agentId || null;
 
     if (req.file) {
-      // File uploaded via multipart
       originalName = req.file.originalname;
       content = req.file.buffer.toString("utf-8");
       mimeType = req.file.mimetype;
     } else if (req.body.name && req.body.content) {
-      // JSON body upload (paste text directly)
       originalName = req.body.name;
       content = req.body.content;
       mimeType = req.body.mimeType || "text/plain";
@@ -64,7 +145,7 @@ app.post("/api/data", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "Provide a file or {name, content} in body" });
     }
 
-    const entry = addFile({ originalName, content, mimeType });
+    const entry = addFile({ originalName, content, mimeType, agentId });
     res.status(201).json(entry);
   } catch (err) {
     res.status(500).json({ error: "Upload failed", detail: err.message });
@@ -120,7 +201,7 @@ app.get("/api/tasks", (req, res) => {
   res.json(getAllTasks());
 });
 
-// Chat with an advisor — supports optional data context files
+// Chat with an advisor — supports optional data context files and memory
 app.post("/api/chat", async (req, res) => {
   const { agentId, message, history = [], contextFileIds = [] } = req.body;
 
@@ -140,8 +221,9 @@ app.post("/api/chat", async (req, res) => {
       .join("\n\n");
 
     const contextBlock = buildContext(contextFileIds);
+    const memoryBlock = buildMemoryContext(agentId);
 
-    const prompt = `${contextBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
+    const prompt = `${contextBlock}${memoryBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
 
     const response = await complete({
       system: agent.systemPrompt,
@@ -162,7 +244,7 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// Run a structured task for an advisor — supports optional data context
+// Run a structured task for an advisor — supports optional data context and memory
 app.post("/api/tasks/run", async (req, res) => {
   const { agentId, taskId, inputs = {}, contextFileIds = [] } = req.body;
 
@@ -172,7 +254,9 @@ app.post("/api/tasks/run", async (req, res) => {
 
   try {
     const contextBlock = buildContext(contextFileIds);
-    const result = await runTask(agentId, taskId, inputs, { complete }, contextBlock);
+    const memoryBlock = buildMemoryContext(agentId);
+    const fullContext = contextBlock + memoryBlock;
+    const result = await runTask(agentId, taskId, inputs, { complete }, fullContext);
     res.json(result);
   } catch (err) {
     console.error("Task error:", err.message);
@@ -273,12 +357,15 @@ app.post("/api/workflows/:id/run", async (req, res) => {
 
 app.get("/api/health", (req, res) => {
   const dataStats = getDataStats();
+  const memStats = getMemoryStats();
   res.json({
     status: "ok",
     llmConfigured: isLLMConfigured(),
+    model: getLLMModel(),
     agentCount: agents.length,
     workflowCount: workflows.length,
     dataFiles: dataStats.fileCount,
+    memoryCount: memStats.total,
   });
 });
 

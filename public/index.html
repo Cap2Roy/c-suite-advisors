@@ -1365,6 +1365,276 @@
       opacity: 0.6;
     }
     .context-chip .remove:hover { opacity: 1; }
+
+    /* --- Settings View --- */
+    .settings-view { max-width: 700px; }
+    .settings-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .settings-panel h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .settings-form-group {
+      margin-bottom: 16px;
+    }
+    .settings-form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+    }
+    .settings-form-group input,
+    .settings-form-group select {
+      width: 100%;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      transition: var(--transition);
+    }
+    .settings-form-group input:focus,
+    .settings-form-group select:focus {
+      border-color: var(--accent);
+      outline: none;
+    }
+    .settings-form-group .hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+    .settings-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    .settings-status.connected {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--success);
+    }
+    .settings-status.demo {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--warning);
+    }
+    .settings-save-btn {
+      padding: 12px 24px;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: var(--transition);
+    }
+    .settings-save-btn:hover { background: var(--accent-hover); }
+    .settings-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* --- Memory View --- */
+    .memory-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .memory-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      transition: var(--transition);
+    }
+    .memory-entry:hover { border-color: var(--border-light); }
+    .memory-entry .mem-icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+    .memory-entry .mem-content { flex: 1; font-size: 13px; line-height: 1.5; }
+    .memory-entry .mem-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .memory-entry .mem-delete {
+      padding: 2px 8px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text-muted);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: var(--transition);
+    }
+    .memory-entry .mem-delete:hover { border-color: var(--danger); color: var(--danger); }
+    .memory-add {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .memory-add input {
+      flex: 1;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .memory-add button {
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: var(--transition);
+    }
+    .memory-add button:hover { background: var(--accent-hover); }
+
+    /* --- Advisor Detail View --- */
+    .advisor-detail { padding: 24px; }
+    .advisor-detail-header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+    }
+    .advisor-detail-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      flex-shrink: 0;
+    }
+    .advisor-detail-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0;
+    }
+    .advisor-tab {
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: var(--transition);
+    }
+    .advisor-tab:hover { color: var(--text); }
+    .advisor-tab.active {
+      color: var(--accent-hover);
+      border-bottom-color: var(--accent);
+    }
+
+    /* --- Improved Workflow Cards --- */
+    .workflow-card-icon-lg {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent-dim), rgba(168, 85, 247, 0.1));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .workflow-card-step-list {
+      display: flex;
+      gap: 4px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .workflow-step-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--bg-elevated);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .workflow-empty {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .workflow-back-btn {
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: var(--transition);
+      margin-bottom: 16px;
+    }
+    .workflow-back-btn:hover { border-color: var(--border-light); color: var(--text); }
+
+    /* --- Persona repository file item --- */
+    .persona-file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+      transition: var(--transition);
+    }
+    .persona-file-item:hover { border-color: var(--border-light); }
+    .persona-file-item .pf-name { flex: 1; font-size: 13px; font-weight: 500; }
+    .persona-file-item .pf-meta { font-size: 11px; color: var(--text-dim); }
+    .persona-file-item .pf-actions { display: flex; gap: 4px; }
+    .persona-file-item .pf-actions button {
+      padding: 3px 8px;
+      font-size: 11px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .persona-file-item .pf-actions button:hover { color: var(--text); }
+    .persona-file-item .pf-actions button.danger:hover { color: var(--danger); border-color: var(--danger); }
   </style>
 </head>
 <body>
@@ -1403,6 +1673,12 @@
         </button>
         <button class="nav-btn" data-view="knowledge" onclick="showView('knowledge')">
           <span class="icon">📚</span> Knowledge Base
+        </button>
+        <button class="nav-btn" data-view="memory" onclick="showView('memory')">
+          <span class="icon">🧠</span> Memory
+        </button>
+        <button class="nav-btn" data-view="settings" onclick="showView('settings')">
+          <span class="icon">⚙️</span> Settings
         </button>
       </div>
 
@@ -1450,13 +1726,17 @@
     let chatContextFiles = [];
     let reportSections = [];
     let workflowRunning = false;
+    let sharedMemory = [];
+    let personalMemory = {};
+    let currentDetailAdvisor = null;
+    let currentDetailTab = 'chat';
 
-    // --- API ---
     const API = {
       getAgents: () => fetch('/api/agents').then(r => r.json()),
       getTasks: () => fetch('/api/tasks').then(r => r.json()),
       getWorkflows: () => fetch('/api/workflows').then(r => r.json()),
       getKnowledge: () => fetch('/api/data').then(r => r.json()),
+      getKnowledgeByAgent: (agentId) => fetch(`/api/data?agentId=${agentId}`).then(r => r.json()),
       chat: (agentId, message, history, contextFileIds) =>
         fetch('/api/chat', {
           method: 'POST',
@@ -1469,11 +1749,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ agentId, taskId, inputs, contextFileIds }),
         }).then(r => r.json()),
-      uploadFile: (name, content) =>
+      uploadFile: (name, content, agentId) =>
         fetch('/api/data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, content }),
+          body: JSON.stringify({ name, content, agentId }),
         }).then(r => r.json()),
       uploadFileForm: (formData) =>
         fetch('/api/data', { method: 'POST', body: formData }).then(r => r.json()),
@@ -1503,18 +1783,47 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fromId, toId, type, message, context }),
         }).then(r => r.json()),
+      // Settings
+      getSettings: () => fetch('/api/settings').then(r => r.json()),
+      updateSettings: (apiKey, apiBase, model) =>
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey, apiBase, model }),
+        }).then(r => r.json()),
+      // Memory
+      getSharedMemory: () => fetch('/api/memory/shared').then(r => r.json()),
+      addSharedMemory: (content) =>
+        fetch('/api/memory/shared', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, createdBy: 'user' }),
+        }).then(r => r.json()),
+      deleteSharedMemory: (id) =>
+        fetch(`/api/memory/shared/${id}`, { method: 'DELETE' }).then(r => r.json()),
+      getPersonalMemory: (agentId) => fetch(`/api/memory/personal/${agentId}`).then(r => r.json()),
+      addPersonalMemory: (agentId, content) =>
+        fetch(`/api/memory/personal/${agentId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+        }).then(r => r.json()),
+      deletePersonalMemory: (agentId, id) =>
+        fetch(`/api/memory/personal/${agentId}/${id}`, { method: 'DELETE' }).then(r => r.json()),
+      getMemoryStats: () => fetch('/api/memory/stats').then(r => r.json()),
     };
 
     // --- Init ---
     async function init() {
       try {
-        const [agentsRes, tasksRes, wfRes, kbRes] = await Promise.all([
-          API.getAgents(), API.getTasks(), API.getWorkflows(), API.getKnowledge()
+        const [agentsRes, tasksRes, wfRes, kbRes, memRes] = await Promise.all([
+          API.getAgents(), API.getTasks(), API.getWorkflows(), API.getKnowledge(), API.getSharedMemory()
         ]);
         advisors = agentsRes;
         allTasks = tasksRes;
         workflows = wfRes;
         knowledgeFiles = kbRes;
+        sharedMemory = memRes;
         renderDashboard();
         checkMode();
       } catch (err) {
@@ -1530,8 +1839,9 @@
         const text = document.getElementById('modeText');
         if (res.llmConfigured) {
           badge.classList.add('live');
-          text.textContent = 'LLM Connected';
+          text.textContent = res.model || 'LLM Connected';
         } else {
+          badge.classList.remove('live');
           text.textContent = 'Demo Mode';
         }
       } catch {
@@ -1592,7 +1902,7 @@
       });
       if (advisorId) {
         currentAdvisor = advisors.find(a => a.id === advisorId);
-        renderChat(currentAdvisor);
+        renderAdvisorDetail(currentAdvisor);
       } else if (view === 'dashboard') {
         renderDashboard();
       } else if (view === 'tasks') {
@@ -1603,6 +1913,12 @@
         renderReportView();
       } else if (view === 'knowledge') {
         renderKnowledgeView();
+      } else if (view === 'memory') {
+        renderMemoryView();
+      } else if (view === 'settings') {
+        renderSettingsView();
+      } else if (view === 'advisor-detail') {
+        if (currentDetailAdvisor) renderAdvisorDetail(currentDetailAdvisor);
       }
       // Close mobile sidebar
       document.getElementById('sidebar').classList.remove('open');
@@ -1665,7 +1981,7 @@
     // --- Advisor List (Sidebar) ---
     function renderAdvisorList() {
       const html = advisors.map(a => `
-        <div class="advisor-card" data-id="${a.id}" onclick="showView('chat','${a.id}')">
+        <div class="advisor-card" data-id="${a.id}" onclick="showAdvisorDetail('${a.id}')">
           <div class="advisor-avatar" style="background: ${a.color}22">${a.icon}</div>
           <div class="advisor-info">
             <div class="name">${a.name}</div>
@@ -2292,6 +2608,440 @@
     // --- Mobile ---
     function toggleSidebar() {
       document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // --- Advisor Detail View ---
+    function showAdvisorDetail(agentId) {
+      currentDetailAdvisor = advisors.find(a => a.id === agentId);
+      if (!currentDetailAdvisor) return;
+      currentDetailTab = 'chat';
+      showView('advisor-detail');
+    }
+
+    async function renderAdvisorDetail(advisor) {
+      if (!advisor) return;
+      currentDetailAdvisor = advisor;
+      const agentTasks = allTasks.filter(t => t.agentId === advisor.id);
+      let agentFiles = [];
+      let agentMem = [];
+      try {
+        [agentFiles, agentMem] = await Promise.all([
+          API.getKnowledgeByAgent(advisor.id),
+          API.getPersonalMemory(advisor.id),
+        ]);
+      } catch {}
+      personalMemory[advisor.id] = agentMem;
+
+      const expertiseHtml = (advisor.expertise || []).map(e => `<span class="tag">${e}</span>`).join('');
+      const capsHtml = (advisor.capabilities || []).map(c => `<span class="tag">${c}</span>`).join('');
+
+      const tasksHtml = agentTasks.length === 0
+        ? '<p class="text-muted" style="padding:12px 0">No tasks defined.</p>'
+        : agentTasks.map(t => `
+          <div class="task-card">
+            <div class="task-card-header">
+              <span class="task-icon">${advisor.icon}</span>
+              <div style="flex:1">
+                <div class="task-name">${t.name}</div>
+                <div class="task-desc">${t.description}</div>
+              </div>
+              <button class="btn btn-sm" onclick="runAdvisorTask('${advisor.id}','${t.id}')">Run</button>
+            </div>
+          </div>
+        `).join('');
+
+      const filesHtml = agentFiles.length === 0
+        ? '<p class="text-muted" style="padding:12px 0">No personal knowledge files yet.</p>'
+        : agentFiles.map(f => `
+          <div class="persona-file-item">
+            <span style="font-size:18px">📄</span>
+            <div class="pf-name">${f.name}</div>
+            <div class="pf-meta">${f.size} chars</div>
+            <div class="pf-actions">
+              <button onclick="viewFile(${f.id})">View</button>
+              <button class="danger" onclick="deleteAdvisorFile(${f.id},'${advisor.id}')">Delete</button>
+    </div>
+          </div>
+        `).join('');
+
+      const memHtml = (personalMemory[advisor.id] || []).length === 0
+        ? '<p class="text-muted" style="padding:12px 0">No personal memory yet.</p>'
+        : (personalMemory[advisor.id] || []).map(m => `
+          <div class="memory-entry">
+            <span class="mem-icon">💭</span>
+            <div class="mem-content">${escapeHtml(m.content)}<div class="mem-meta">Added ${new Date(m.createdAt).toLocaleDateString()}</div></div>
+            <button class="mem-delete" onclick="deleteAdvisorMemory('${advisor.id}',${m.id})">Delete</button>
+          </div>
+        `).join('');
+
+      const sharedMemHtml = sharedMemory.length === 0
+        ? '<p class="text-muted" style="padding:12px 0">No shared memory yet.</p>'
+        : sharedMemory.map(m => `
+          <div class="memory-entry">
+            <span class="mem-icon">🌐</span>
+            <div class="mem-content">${escapeHtml(m.content)}<div class="mem-meta">Added ${new Date(m.createdAt).toLocaleDateString()} by ${m.createdBy || 'user'}</div></div>
+            <button class="mem-delete" onclick="deleteSharedMemoryEntry(${m.id})">Delete</button>
+          </div>
+        `).join('');
+
+      const tab = currentDetailTab;
+      const content = `
+        <div class="advisor-detail">
+          <button class="workflow-back-btn" onclick="showView('dashboard')">← Back to Dashboard</button>
+          <div class="advisor-detail-header">
+            <div class="advisor-detail-avatar" style="background: ${advisor.color}22">${advisor.icon}</div>
+            <div style="flex:1">
+              <h1 style="font-size:24px;font-weight:700;margin-bottom:4px">${advisor.name}</h1>
+              <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px">${advisor.title}</div>
+              <div style="font-size:14px;color:var(--text)">${advisor.tagline || ''}</div>
+            </div>
+            <button class="settings-save-btn" onclick="startAdvisorChat('${advisor.id}')">💬 Chat</button>
+          </div>
+
+          <div class="advisor-detail-tabs">
+            <button class="advisor-tab ${tab === 'chat' ? 'active' : ''}" onclick="switchAdvisorTab('chat')">Overview</button>
+            <button class="advisor-tab ${tab === 'tasks' ? 'active' : ''}" onclick="switchAdvisorTab('tasks')">Tasks (${agentTasks.length})</button>
+            <button class="advisor-tab ${tab === 'files' ? 'active' : ''}" onclick="switchAdvisorTab('files')">Knowledge (${agentFiles.length})</button>
+            <button class="advisor-tab ${tab === 'memory' ? 'active' : ''}" onclick="switchAdvisorTab('memory')">Memory (${(personalMemory[advisor.id] || []).length})</button>
+          </div>
+
+          <div id="advisorTabContent">
+            ${renderAdvisorTabContent(tab, { advisor, tasksHtml, filesHtml, memHtml, sharedMemHtml, expertiseHtml, capsHtml, agentFiles })}
+          </div>
+        </div>
+      `;
+      document.getElementById('mainContent').innerHTML = content;
+    }
+
+    function renderAdvisorTabContent(tab, ctx) {
+      const { advisor, tasksHtml, filesHtml, memHtml, sharedMemHtml, expertiseHtml, capsHtml, agentFiles } = ctx;
+      if (tab === 'chat') {
+        return `
+          <div class="card">
+            <h3>Expertise & Capabilities</h3>
+            <div style="margin-bottom:12px"><strong style="font-size:12px;color:var(--text-dim)">EXPERTISE</strong></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">${expertiseHtml}</div>
+            <div style="margin-bottom:12px"><strong style="font-size:12px;color:var(--text-dim)">CAPABILITIES</strong></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">${capsHtml}</div>
+          </div>
+        `;
+      }
+      if (tab === 'tasks') {
+        return `<div>${tasksHtml}</div>`;
+      }
+      if (tab === 'files') {
+        return `
+          <div class="card">
+            <h3>Personal Knowledge Files</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px">Files tagged to ${advisor.name}. Used as context when chatting or running tasks.</p>
+            <div style="margin-bottom:12px;display:flex;gap:8px">
+              <input type="file" id="advisorFileInput" class="hidden-file-input" style="display:none" onchange="uploadAdvisorFile('${advisor.id}', this)">
+              <button class="btn" onclick="document.getElementById('advisorFileInput').click()">📎 Upload File</button>
+              <button class="btn" onclick="addAdvisorTextFile('${advisor.id}')">📝 Add Text</button>
+            </div>
+            ${filesHtml}
+          </div>
+        `;
+      }
+      if (tab === 'memory') {
+        return `
+          <div class="memory-section">
+            <h3 style="font-size:16px;font-weight:700;margin-bottom:8px">🧠 Personal Memory</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px">Notes specific to ${advisor.name}. Injected into their prompts automatically.</p>
+            ${memHtml}
+            <div class="memory-add">
+              <input type="text" id="personalMemInput-${advisor.id}" placeholder="Add a memory note for ${advisor.name}...">
+              <button onclick="addAdvisorMemory('${advisor.id}')">Add</button>
+            </div>
+          </div>
+          <div class="memory-section">
+            <h3 style="font-size:16px;font-weight:700;margin-bottom:8px">🌐 Shared Memory</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px">Shared organizational context. Injected into all advisors' prompts.</p>
+            ${sharedMemHtml}
+            <div class="memory-add">
+              <input type="text" id="sharedMemInput-${advisor.id}" placeholder="Add shared memory...">
+              <button onclick="addSharedMemoryEntry('${advisor.id}')">Add</button>
+            </div>
+            </div>
+          </div>
+        `;
+      }
+      return '';
+    }
+
+    function switchAdvisorTab(tab) {
+      currentDetailTab = tab;
+      if (currentDetailAdvisor) renderAdvisorDetail(currentDetailAdvisor);
+    }
+
+    function startAdvisorChat(agentId) {
+      const advisor = advisors.find(a => a.id === agentId);
+      if (!advisor) return;
+      currentAdvisor = advisor;
+      renderChat(advisor);
+    }
+
+    async function runAdvisorTask(agentId, taskId) {
+      showLoading('Running task...');
+      try {
+        const result = await API.runTask(agentId, taskId, {}, []);
+        showTaskResult(`Task Result`, result.output || result.result || JSON.stringify(result));
+      } catch (err) {
+        alert('Task failed: ' + err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function uploadAdvisorFile(agentId, input) {
+      const file = input.files[0];
+      if (!file) return;
+      showLoading('Uploading...');
+      try {
+        const text = await file.text();
+        await API.uploadFile(file.name, text, agentId);
+        renderAdvisorDetail(currentDetailAdvisor);
+      } catch (err) {
+        alert('Upload failed: ' + err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function addAdvisorTextFile(agentId) {
+      const name = prompt('File name:');
+      if (!name) return;
+      const content = prompt('File content:');
+      if (!content) return;
+      try {
+        await API.uploadFile(name, content, agentId);
+        renderAdvisorDetail(currentDetailAdvisor);
+      } catch (err) {
+        alert('Failed: ' + err.message);
+      }
+    }
+
+    async function deleteAdvisorFile(fileId, agentId) {
+      if (!confirm('Delete this file?')) return;
+      try {
+        await API.deleteFile(fileId);
+        renderAdvisorDetail(currentDetailAdvisor);
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
+    }
+
+    async function addAdvisorMemory(agentId) {
+      const input = document.getElementById(`personalMemInput-${agentId}`);
+      const content = input.value.trim();
+      if (!content) return;
+      try {
+        await API.addPersonalMemory(agentId, content);
+        input.value = '';
+        renderAdvisorDetail(currentDetailAdvisor);
+      } catch (err) {
+        alert('Failed to add memory: ' + err.message);
+      }
+    }
+
+    async function deleteAdvisorMemory(agentId, id) {
+      if (!confirm('Delete this memory?')) return;
+      try {
+        await API.deletePersonalMemory(agentId, id);
+        renderAdvisorDetail(currentDetailAdvisor);
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
+    }
+
+    async function addSharedMemoryEntry(agentId) {
+      const input = document.getElementById(`sharedMemInput-${agentId}`);
+      const content = input.value.trim();
+      if (!content) return;
+      try {
+        await API.addSharedMemory(content);
+        sharedMemory = await API.getSharedMemory();
+        renderAdvisorDetail(currentDetailAdvisor);
+      } catch (err) {
+        alert('Failed: ' + err.message);
+      }
+    }
+
+    async function deleteSharedMemoryEntry(id) {
+      if (!confirm('Delete this shared memory?')) return;
+      try {
+        await API.deleteSharedMemory(id);
+        sharedMemory = await API.getSharedMemory();
+        renderAdvisorDetail(currentDetailAdvisor);
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
+    }
+
+    // --- Memory View ---
+    async function renderMemoryView() {
+      let stats;
+      try { stats = await API.getMemoryStats(); } catch { stats = { sharedCount: 0, personalCount: 0, total: 0, advisorsWithMemory: 0 }; }
+      const sharedHtml = sharedMemory.length === 0
+        ? '<p class="text-muted" style="padding:12px 0">No shared memory yet.</p>'
+        : sharedMemory.map(m => `
+          <div class="memory-entry">
+            <span class="mem-icon">🌐</span>
+            <div class="mem-content">${escapeHtml(m.content)}<div class="mem-meta">Added ${new Date(m.createdAt).toLocaleDateString()} by ${m.createdBy || 'user'}</div></div>
+            <button class="mem-delete" onclick="deleteSharedMemoryEntry(${m.id})">Delete</button>
+          </div>
+        `).join('');
+
+      const content = `
+        <div class="settings-view" style="max-width:800px">
+          <h2 style="font-size:22px;font-weight:700;margin-bottom:16px">🧠 Memory System</h2>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value">${stats.total}</div>
+              <div class="stat-label">Total Memories</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${stats.sharedCount}</div>
+              <div class="stat-label">Shared</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${stats.personalCount}</div>
+              <div class="stat-label">Personal</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${stats.advisorsWithMemory}</div>
+              <div class="stat-label">Advisors w/ Memory</div>
+            </div>
+          </div>
+          <div class="memory-section">
+            <h3 style="font-size:16px;font-weight:700;margin-bottom:8px">🌐 Shared Memory</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px">Shared organizational context injected into all advisors' prompts.</p>
+            ${sharedHtml}
+            <div class="memory-add">
+              <input type="text" id="globalSharedMemInput" placeholder="Add shared memory...">
+              <button onclick="addGlobalSharedMemory()">Add</button>
+            </div>
+          </div>
+          <div class="memory-section">
+            <h3 style="font-size:16px;font-weight:700;margin-bottom:8px">📋 Per-Advisor Memory</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px">View and manage individual advisor memory. Click an advisor to jump to their detail page.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+              ${advisors.map(a => `
+                <div class="advisor-card" style="border:1px solid var(--border);cursor:pointer" onclick="showAdvisorDetail('${a.id}');setTimeout(()=>switchAdvisorTab('memory'),100)">
+                  <div class="advisor-avatar" style="background:${a.color}22">${a.icon}</div>
+                  <div class="advisor-info">
+    <div class="name">${a.name}</div>
+                    <div class="title">${a.shortTitle}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('mainContent').innerHTML = content;
+    }
+
+    async function addGlobalSharedMemory() {
+      const input = document.getElementById('globalSharedMemInput');
+      const content = input.value.trim();
+      if (!content) return;
+      try {
+        await API.addSharedMemory(content);
+        sharedMemory = await API.getSharedMemory();
+        renderMemoryView();
+      } catch (err) {
+        alert('Failed: ' + err.message);
+      }
+    }
+
+    // --- Settings View ---
+    async function renderSettingsView() {
+      let s;
+      try { s = await API.getSettings(); } catch { s = { apiKey: '', apiBase: 'https://api.openai.com/v1', model: 'gpt-4o', hasKey: false, maskedKey: '' }; }
+      const statusHtml = s.hasKey
+        ? `<div class="settings-status connected">✅ LLM Connected — API key set (currently using <strong>${escapeHtml(s.model)}</strong>)</div>`
+        : `<div class="settings-status demo">⚠️ Demo Mode — No API key configured. Set your key to enable live LLM responses.</div>`;
+
+      const content = `
+        <div class="settings-view">
+          <h2 style="font-size:22px;font-weight:700;margin-bottom:16px">⚙️ Settings</h2>
+          ${statusHtml}
+          <div class="settings-panel">
+            <h3>🔧 LLM Configuration</h3>
+            <div class="settings-form-group">
+              <label for="settingsApiKey">API Key</label>
+              <input type="password" id="settingsApiKey" placeholder="${s.maskedKey ? 'Current: ' + s.maskedKey : 'sk-...'}" autocomplete="new-password">
+              <div class="hint">OpenAI-compatible API key. Leave blank to keep current key.</div>
+            </div>
+            <div class="settings-form-group">
+      <label for="settingsApiBase">API Base URL</label>
+              <input type="text" id="settingsApiBase" value="${escapeHtml(s.apiBase)}" placeholder="https://api.openai.com/v1">
+              <div class="hint">Any OpenAI-compatible endpoint (e.g. OpenAI, OpenRouter, LM Studio, etc.)</div>
+            </div>
+            <div class="settings-form-group">
+              <label for="settingsModel">Model</label>
+              <input type="text" id="settingsModel" value="${escapeHtml(s.model)}" placeholder="gpt-4o">
+              <div class="hint">Model name (e.g. gpt-4o, gpt-4o-mini, llama-3.1-70b, etc.)</div>
+            </div>
+            <button class="settings-save-btn" id="settingsSaveBtn" onclick="saveSettings()">Save Settings</button>
+            <span id="settingsSavedMsg" style="margin-left:12px;font-size:13px;color:var(--success)"></span>
+          </div>
+          <div class="settings-panel">
+            <h3>ℹ️ About</h3>
+            <p class="text-muted" style="font-size:13px;line-height:1.6">
+              C-Suite AI Advisors lets you interact with AI personas representing key C-level executives.
+              Configure your LLM API key here to enable live responses, or use demo mode to explore the UI.
+              Memory and knowledge files are injected into advisor prompts automatically.
+            </p>
+          </div>
+        </div>
+      `;
+      document.getElementById('mainContent').innerHTML = content;
+    }
+
+    async function saveSettings() {
+      const btn = document.getElementById('settingsSaveBtn');
+      const msg = document.getElementById('settingsSavedMsg');
+      const apiKey = document.getElementById('settingsApiKey').value;
+      const apiBase = document.getElementById('settingsApiBase').value;
+      const model = document.getElementById('settingsModel').value;
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      try {
+        // Send undefined if apiKey input is blank (keep current key)
+        const payload = { apiBase, model };
+        if (apiKey.trim()) payload.apiKey = apiKey.trim();
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        msg.textContent = '✓ Saved';
+        checkMode();
+        setTimeout(() => renderSettingsView(), 1000);
+      } catch (err) {
+        msg.textContent = '✗ Failed: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Settings';
+      }
+    }
+
+    // --- Helpers ---
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
+    async function viewFile(id) {
+      try {
+        const file = await fetch(`/api/data/${id}`).then(r => r.json());
+        showTaskResult(file.name, file.content);
+      } catch (err) {
+        alert('Failed to load file: ' + err.message);
+      }
     }
 
     // --- Start ---

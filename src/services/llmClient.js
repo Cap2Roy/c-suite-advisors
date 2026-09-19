@@ -2,15 +2,18 @@
 // Supports OpenAI-compatible chat completion APIs.
 // Falls back to a deterministic demo mode when no API key is configured,
 // so the application is fully functional out of the box for evaluation.
+// Reads config from settings store (data/settings.json) with env var fallback.
 
 import "dotenv/config";
+import { getLLMConfig } from "./settingsStore.js";
 
-const API_KEY = process.env.OPENAI_API_KEY || process.env.LLM_API_KEY || "";
-const API_BASE =
-  process.env.OPENAI_API_BASE || process.env.LLM_API_BASE || "https://api.openai.com/v1";
-const MODEL = process.env.LLM_MODEL || "gpt-4o";
+export function isLLMConfigured() {
+  return Boolean(getLLMConfig().apiKey);
+}
 
-export const isLLMConfigured = () => Boolean(API_KEY);
+export function getLLMModel() {
+  return getLLMConfig().model;
+}
 
 /**
  * Call an OpenAI-compatible chat completion endpoint.
@@ -18,16 +21,17 @@ export const isLLMConfigured = () => Boolean(API_KEY);
  * @returns {Promise<string>} The assistant's response text.
  */
 export async function complete({ system, prompt, maxTokens = 2000 }) {
-  if (API_KEY) {
-    return completeWithAPI({ system, prompt, maxTokens });
+  const config = getLLMConfig();
+  if (config.apiKey) {
+    return completeWithAPI({ system, prompt, maxTokens }, config);
   }
   return demoResponse({ system, prompt });
 }
 
-async function completeWithAPI({ system, prompt, maxTokens }) {
-  const url = `${API_BASE}/chat/completions`;
+async function completeWithAPI({ system, prompt, maxTokens }, config) {
+  const url = `${config.apiBase}/chat/completions`;
   const body = {
-    model: MODEL,
+    model: config.model,
     messages: [
       { role: "system", content: system },
       { role: "user", content: prompt },
@@ -40,7 +44,7 @@ async function completeWithAPI({ system, prompt, maxTokens }) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
   });
@@ -53,6 +57,7 @@ async function completeWithAPI({ system, prompt, maxTokens }) {
   const data = await res.json();
   return data.choices?.[0]?.message?.content ?? "";
 }
+
 
 /**
  * Demo mode: produces a structured, advisor-aware response when no API key is set.

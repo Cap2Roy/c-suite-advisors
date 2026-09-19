@@ -36,7 +36,7 @@ function writeIndex(index) {
  * @param {{originalName: string, content: string, mimeType?: string}} file
  * @returns {object} The stored file metadata
  */
-export function addFile({ originalName, content, mimeType = "text/plain" }) {
+export function addFile({ originalName, content, mimeType = "text/plain", agentId = null }) {
   const index = readIndex();
   const id = index.nextId++;
   const entry = {
@@ -47,6 +47,7 @@ export function addFile({ originalName, content, mimeType = "text/plain" }) {
     size: content.length,
     contentHash: createHash("sha256").update(content).digest("hex").slice(0, 16),
     uploadedAt: new Date().toISOString(),
+    agentId,
   };
   index.files.push(entry);
   writeIndex(index);
@@ -55,10 +56,17 @@ export function addFile({ originalName, content, mimeType = "text/plain" }) {
 
 /**
  * List all files in the repository (metadata only — no content).
+ * @param {string|null} agentId - If provided, filter to files owned by this agent.
+ *        If null, return global (non-agent-specific) files only.
+ *        If omitted, return all files.
  */
-export function listFiles() {
+export function listFiles(agentId) {
   const index = readIndex();
-  return index.files.map(({ content, ...meta }) => meta);
+  let files = index.files;
+  if (agentId !== undefined) {
+    files = files.filter((f) => (f.agentId || null) === agentId);
+  }
+  return files.map(({ content, ...meta }) => meta);
 }
 
 /**
