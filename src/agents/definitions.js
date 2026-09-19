@@ -524,7 +524,7 @@ When given a product challenge, you start with the user and the problem. You fra
     ],
   },
   {
-    id: "csO",
+    id: "cso",
     name: "James Okonkwo",
     title: "Chief Strategy Officer",
     shortTitle: "CSO",

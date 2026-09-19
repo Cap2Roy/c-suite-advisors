@@ -8,7 +8,7 @@ import { getAgentById, agents } from "../agents/definitions.js";
  * Build a task execution prompt for the LLM.
  * Combines the advisor's system prompt with task-specific instructions.
  */
-function buildTaskPrompt(agent, task, inputValues) {
+function buildTaskPrompt(agent, task, inputValues, contextBlock = "") {
   const inputBlock = task.inputs
     .map((key) => {
       const value = inputValues[key] || "[not provided]";
@@ -17,7 +17,7 @@ function buildTaskPrompt(agent, task, inputValues) {
     .join("\n");
 
   return `${agent.systemPrompt}
-
+${contextBlock}
 TASK: ${task.name}
 ${task.description}
 
@@ -25,7 +25,7 @@ INPUTS:
 ${inputBlock}
 
 INSTRUCTIONS:
-You are executing this task as ${agent.name}, ${agent.title}. Produce a professional, structured deliverable. Use clear headings (##), bullet points, and tables where appropriate. Be specific and actionable — avoid generic advice. Draw on your domain expertise to provide insights a non-expert wouldn't think of. If the inputs are insufficient, make reasonable assumptions and state them.
+You are executing this task as ${agent.name}, ${agent.title}. Produce a professional, structured deliverable. Use clear headings (##), bullet points, and tables where appropriate. Be specific and actionable — avoid generic advice. Draw on your domain expertise to provide insights a non-expert wouldn't think of. If the inputs are insufficient, make reasonable assumptions and state them. If reference documents are provided, incorporate their information into your analysis.
 
 Format your response as a professional document with:
 1. Executive Summary
@@ -45,7 +45,7 @@ Be thorough but concise. This is a real deliverable for a real business decision
  * @param {Object} llmClient - The LLM client instance
  * @returns {Promise<{agent, task, result, timestamp}>}
  */
-export async function runTask(agentId, taskId, inputValues, llmClient) {
+export async function runTask(agentId, taskId, inputValues, llmClient, contextBlock = "") {
   const agent = getAgentById(agentId);
   if (!agent) {
     throw new Error(`Unknown advisor: ${agentId}`);
@@ -56,7 +56,7 @@ export async function runTask(agentId, taskId, inputValues, llmClient) {
     throw new Error(`Unknown task for ${agent.shortTitle}: ${taskId}`);
   }
 
-  const prompt = buildTaskPrompt(agent, task, inputValues);
+  const prompt = buildTaskPrompt(agent, task, inputValues, contextBlock);
 
   const result = await llmClient.complete({
     system: agent.systemPrompt,

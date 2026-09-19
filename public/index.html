@@ -1057,8 +1057,314 @@
         justify-content: center;
         font-size: 20px;
       }
-      .dashboard, .task-view { padding: 60px 16px 16px; }
+      .dashboard, .task-view, .kb-view, .workflow-view, .report-view { padding: 60px 16px 16px; }
     }
+
+    /* --- Knowledge Base --- */
+    .kb-upload-area {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      margin-bottom: 20px;
+    }
+    .kb-upload-area:hover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .kb-upload-area.dragover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .kb-upload-area .upload-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    .kb-file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .kb-file-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      transition: var(--transition);
+    }
+    .kb-file-item:hover {
+      border-color: var(--border-light);
+      background: var(--bg-hover);
+    }
+    .kb-file-icon { font-size: 20px; flex-shrink: 0; }
+    .kb-file-info { flex: 1; min-width: 0; }
+    .kb-file-name {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .kb-file-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .kb-file-actions { display: flex; gap: 6px; flex-shrink: 0; }
+ }
+    .kb-file-actions button {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .kb-file-actions button:hover { background: var(--bg-hover); }
+    .kb-file-actions button.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* --- Workflows --- */
+    .workflow-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .workflow-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .workflow-card:hover {
+      border-color: var(--border-light);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+    .workflow-card.selected {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .workflow-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .workflow-card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: var(--bg-elevated);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+    .workflow-card-name { font-size: 16px; font-weight: 700; }
+    .workflow-card-steps { font-size: 12px; color: var(--text-muted); }
+    .workflow-card-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .workflow-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin: 16px 0;
+    }
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      position: relative;
+      padding-bottom: 20px;
+    }
+    .flow-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 19px;
+      top: 40px;
+      bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+    .flow-step-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      z-index: 1;
+    }
+    .flow-step-icon.done {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: var(--success);
+    }
+    .flow-step-icon.active {
+      border-color: var(--accent);
+      animation: pulse 1.5s infinite;
+    }
+    .flow-step-content { flex: 1; padding-top: 4px; }
+    .flow-step-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .flow-step-title .agent-tag {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 400;
+      margin-left: 6px;
+    }
+    .flow-step-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .flow-step-result {
+      margin-top: 8px;
+      padding: 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .workflow-run-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-top: 16px;
+    }
+
+    /* --- Reports --- */
+    .report-section-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .report-section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .report-section-header .agent-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .report-section-header .name { font-size: 14px; font-weight: 600; }
+    .report-section-header .title { font-size: 12px; color: var(--text-muted); }
+    .report-section-header .remove-btn {
+      margin-left: auto;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .report-section-header .remove-btn:hover { border-color: var(--danger); color: var(--danger); }
+    .report-add-section {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .report-add-section select,
+    .report-add-section input {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .report-add-section select { flex-shrink: 0; }
+    .report-add-section input { flex: 1; }
+    .report-add-section button {
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: var(--transition);
+    }
+    .report-add-section button:hover { background: var(--accent-hover); }
+
+    /* --- Context file picker in chat --- */
+    .context-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .context-bar label {
+      color: var(--text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .context-bar select {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .context-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--accent-dim);
+      color: var(--accent-hover);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .context-chip .remove {
+      cursor: pointer;
+      opacity: 0.6;
+    }
+    .context-chip .remove:hover { opacity: 1; }
   </style>
 </head>
 <body>
@@ -1088,6 +1394,15 @@
         </button>
         <button class="nav-btn" data-view="tasks" onclick="showView('tasks')">
           <span class="icon">📋</span> Tasks
+        </button>
+        <button class="nav-btn" data-view="workflows" onclick="showView('workflows')">
+          <span class="icon">🔄</span> Workflows
+        </button>
+        <button class="nav-btn" data-view="reports" onclick="showView('reports')">
+          <span class="icon">📑</span> Reports
+        </button>
+        <button class="nav-btn" data-view="knowledge" onclick="showView('knowledge')">
+          <span class="icon">📚</span> Knowledge Base
         </button>
       </div>
 
@@ -1126,36 +1441,80 @@
     // --- State ---
     let advisors = [];
     let allTasks = [];
+    let workflows = [];
+    let knowledgeFiles = [];
     let currentView = 'dashboard';
     let currentAdvisor = null;
     let chatHistory = {};
     let selectedTask = null;
+    let chatContextFiles = [];
+    let reportSections = [];
+    let workflowRunning = false;
 
     // --- API ---
     const API = {
       getAgents: () => fetch('/api/agents').then(r => r.json()),
       getTasks: () => fetch('/api/tasks').then(r => r.json()),
-      chat: (agentId, message, history) =>
+      getWorkflows: () => fetch('/api/workflows').then(r => r.json()),
+      getKnowledge: () => fetch('/api/data').then(r => r.json()),
+      chat: (agentId, message, history, contextFileIds) =>
         fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId, message, history }),
+          body: JSON.stringify({ agentId, message, history, contextFileIds }),
         }).then(r => r.json()),
-      runTask: (agentId, taskId, inputs) =>
+      runTask: (agentId, taskId, inputs, contextFileIds) =>
         fetch('/api/tasks/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId, taskId, inputs }),
+          body: JSON.stringify({ agentId, taskId, inputs, contextFileIds }),
+        }).then(r => r.json()),
+      uploadFile: (name, content) =>
+        fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, content }),
+        }).then(r => r.json()),
+      uploadFileForm: (formData) =>
+        fetch('/api/data', { method: 'POST', body: formData }).then(r => r.json()),
+      deleteFile: (id) =>
+        fetch(`/api/data/${id}`, { method: 'DELETE' }).then(r => r.json()),
+      runWorkflow: (id, input) =>
+        fetch(`/api/workflows/${id}/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input }),
+        }).then(r => r.json()),
+      generateReport: (title, subject, sections, synthesizerId) =>
+        fetch('/api/reports/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, subject, sections, synthesizerId }),
+        }).then(r => r.json()),
+      discuss: (topic, agentIds) =>
+        fetch('/api/agents/discuss', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, agentIds }),
+        }).then(r => r.json()),
+      message: (fromId, toId, type, message, context) =>
+        fetch('/api/agents/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fromId, toId, type, message, context }),
         }).then(r => r.json()),
     };
 
     // --- Init ---
     async function init() {
       try {
-        const [agentsRes, tasksRes] = await Promise.all([API.getAgents(), API.getTasks()]);
+        const [agentsRes, tasksRes, wfRes, kbRes] = await Promise.all([
+          API.getAgents(), API.getTasks(), API.getWorkflows(), API.getKnowledge()
+        ]);
         advisors = agentsRes;
         allTasks = tasksRes;
-        renderAdvisorList();
+        workflows = wfRes;
+        knowledgeFiles = kbRes;
         renderDashboard();
         checkMode();
       } catch (err) {
@@ -1238,6 +1597,12 @@
         renderDashboard();
       } else if (view === 'tasks') {
         renderTaskView();
+      } else if (view === 'workflows') {
+        renderWorkflowView();
+      } else if (view === 'reports') {
+        renderReportView();
+      } else if (view === 'knowledge') {
+        renderKnowledgeView();
       }
       // Close mobile sidebar
       document.getElementById('sidebar').classList.remove('open');
@@ -1261,6 +1626,14 @@
             <div class="stat-card">
               <div class="stat-value">${totalTasks}</div>
               <div class="stat-label">Pre-built Tasks</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${workflows.length}</div>
+              <div class="stat-label">Workflows</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${knowledgeFiles.length}</div>
+              <div class="stat-label">Knowledge Files</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">${capabilities}</div>
@@ -1330,6 +1703,16 @@
             ` : history.map(msg => renderMessage(msg, advisor)).join('')}
           </div>
           <div class="chat-input-area">
+            ${knowledgeFiles.length > 0 ? `
+              <div class="context-bar">
+                <label>📎 Context:</label>
+                <select id="contextFileSelect" onchange="toggleContextFile(this.value)">
+                  <option value="">No reference file</option>
+                  ${knowledgeFiles.map(f => `<option value="${f.id}">${f.name}</option>`).join('')}
+                </select>
+                <div id="contextChips" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+              </div>
+            ` : ''}
             <div class="chat-input-wrapper">
               <textarea class="chat-input" id="chatInput" placeholder="Ask ${advisor.name} anything..." rows="1"
                 onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
@@ -1384,7 +1767,7 @@
       scrollMessages();
 
       try {
-        const res = await API.chat(currentAdvisor.id, message, history.slice(0, -1));
+        const res = await API.chat(currentAdvisor.id, message, history.slice(0, -1), chatContextFiles);
         document.getElementById('typingIndicator')?.remove();
         if (res.error) throw new Error(res.error);
         chatHistory[currentAdvisor.id].push({ role: 'assistant', content: res.response });
@@ -1557,6 +1940,355 @@
       document.getElementById('loadingOverlay').classList.remove('active');
     }
 
+    // --- Context Files ---
+    function toggleContextFile(id) {
+      if (!id) return;
+      const numId = Number(id);
+      if (!chatContextFiles.includes(numId)) {
+        chatContextFiles.push(numId);
+        renderContextChips();
+      }
+      document.getElementById('contextFileSelect').value = '';
+    }
+
+    function removeContextFile(id) {
+      chatContextFiles = chatContextFiles.filter(f => f !== id);
+      renderContextChips();
+    }
+
+    function renderContextChips() {
+      const container = document.getElementById('contextChips');
+      if (!container) return;
+      container.innerHTML = chatContextFiles.map(id => {
+        const file = knowledgeFiles.find(f => f.id === id);
+        if (!file) return '';
+        return `<span class="context-chip">📎 ${file.name} <span class="remove" onclick="removeContextFile(${id})">✕</span></span>`;
+      }).join('');
+    }
+
+    // --- Knowledge Base View ---
+    function renderKnowledgeView() {
+      const content = `
+        <div class="kb-view">
+          <div class="dashboard-header">
+            <h2>Knowledge Base</h2>
+            <p>Upload reference documents that advisors can use as context during chats and tasks.</p>
+          </div>
+          <div class="kb-upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">📤</div>
+            <div style="font-size: 14px; font-weight: 600;">Click to upload or drag & drop</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Text files, .md, .txt, .json — max 2MB</div>
+            <input type="file" id="fileInput" style="display:none" accept=".txt,.md,.json,.csv,.log" onchange="handleFileUpload(this.files[0])">
+          </div>
+          <div style="margin-bottom: 16px;">
+            <details>
+              <summary style="cursor:pointer; font-size:13px; color:var(--text-muted); font-weight:600;">Or paste text directly</summary>
+              <div style="margin-top:12px;">
+                <input type="text" id="pasteName" placeholder="File name..." style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:14px;margin-bottom:8px;">
+                <textarea id="pasteContent" placeholder="Paste content here..." style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:14px;min-height:120px;resize:vertical;"></textarea>
+                <button class="run-btn" style="margin-top:8px;" onclick="handlePasteUpload()">Upload Text</button>
+              </div>
+            </details>
+          </div>
+          <h3 style="font-size:16px; font-weight:700; margin-bottom:12px;">📁 Files (${knowledgeFiles.length})</h3>
+          <div class="kb-file-list" id="kbFileList">
+            ${knowledgeFiles.length === 0 ? '<p style="color:var(--text-muted);font-size:14px;">No files yet. Upload one to get started.</p>' : knowledgeFiles.map(f => `
+              <div class="kb-file-item">
+                <div class="kb-file-icon">📄</div>
+                <div class="kb-file-info">
+                  <div class="kb-file-name">${f.name}</div>
+                  <div class="kb-file-meta">${(f.size/1024).toFixed(1)} KB • ${f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString() : 'Unknown'}</div>
+                </div>
+                <div class="kb-file-actions">
+                  <button onclick="viewFile(${f.id})">View</button>
+                  <button class="danger" onclick="deleteKnowledgeFile(${f.id})">Delete</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      document.getElementById('mainContent').innerHTML = content;
+      // Setup drag and drop
+      const area = document.getElementById('uploadArea');
+      if (area) {
+        area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('dragover'); });
+        area.addEventListener('dragleave', () => area.classList.remove('dragover'));
+        area.addEventListener('drop', e => {
+          e.preventDefault();
+          area.classList.remove('dragover');
+          if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]);
+        });
+      }
+    }
+
+    async function handleFileUpload(file) {
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) { alert('File too large (max 2MB)'); return; }
+      const formData = new FormData();
+      formData.append('file', file);
+      showLoading('Uploading...');
+      try {
+        await API.uploadFileForm(formData);
+        knowledgeFiles = await API.getKnowledge();
+        hideLoading();
+        renderKnowledgeView();
+      } catch (err) {
+        hideLoading();
+        alert('Upload failed: ' + err.message);
+      }
+    }
+
+    async function handlePasteUpload() {
+      const name = document.getElementById('pasteName').value.trim();
+      const content = document.getElementById('pasteContent').value.trim();
+      if (!name || !content) { alert('Provide both name and content'); return; }
+      showLoading('Uploading...');
+      try {
+        await API.uploadFile(name, content);
+        knowledgeFiles = await API.getKnowledge();
+        hideLoading();
+        renderKnowledgeView();
+      } catch (err) {
+        hideLoading();
+        alert('Upload failed: ' + err.message);
+      }
+    }
+
+    async function deleteKnowledgeFile(id) {
+      if (!confirm('Delete this file?')) return;
+      try {
+        await API.deleteFile(id);
+        knowledgeFiles = await API.getKnowledge();
+        renderKnowledgeView();
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
+    }
+
+    async function viewFile(id) {
+      try {
+        const res = await fetch(`/api/data/${id}`).then(r => r.json());
+        showTaskResult(res.name, res.content);
+      } catch (err) {
+        alert('Failed to load: ' + err.message);
+      }
+    }
+
+    // --- Workflows View ---
+    function renderWorkflowView() {
+      const content = `
+        <div class="workflow-view">
+          <div class="dashboard-header">
+            <h2>Workflows</h2>
+            <p>Multi-advisor flows where the team collaborates in sequence. Each step builds on prior outputs.</p>
+          </div>
+          <div class="workflow-grid">
+            ${workflows.map(w => `
+              <div class="workflow-card" id="wf-card-${w.id}" onclick="selectWorkflow('${w.id}')">
+                <div class="workflow-card-header">
+                  <div class="workflow-card-icon">${w.icon}</div>
+                  <div>
+                    <div class="workflow-card-name">${w.name}</div>
+                    <div class="workflow-card-steps">${w.stepCount} steps</div>
+                  </div>
+                </div>
+                <div class="workflow-card-desc">${w.description}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div id="workflowDetail"></div>
+        </div>
+      `;
+      document.getElementById('mainContent').innerHTML = content;
+    }
+
+    let selectedWorkflow = null;
+    function selectWorkflow(id) {
+      document.querySelectorAll('.workflow-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById(`wf-card-${id}`).classList.add('selected');
+      selectedWorkflow = workflows.find(w => w.id === id);
+      const agentMap = {};
+      advisors.forEach(a => { agentMap[a.id] = a; });
+      const detailHtml = `
+        <div class="workflow-run-panel">
+          <h3 style="font-size:16px; font-weight:700; margin-bottom:8px;">${selectedWorkflow.icon} ${selectedWorkflow.name}</h3>
+          <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">${selectedWorkflow.description}</p>
+          <div class="workflow-flow">
+            ${selectedWorkflow.steps.map(s => {
+              const a = agentMap[s.agentId];
+              return `
+                <div class="flow-step" id="flow-step-${s.id}">
+                  <div class="flow-step-icon" id="flow-icon-${s.id}">${a ? a.icon : '?'}</div>
+                  <div class="flow-step-content">
+                    <div class="flow-step-title">Step ${s.id}: ${s.action.split(' ').slice(0,4).join(' ')}...
+                      <span class="agent-tag">${a ? a.name + ' (' + a.shortTitle + ')' : ''}</span>
+                    </div>
+                    <div class="flow-step-desc">${s.action}</div>
+                    <div id="flow-result-${s.id}"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div class="form-group">
+            <label>Describe your situation</label>
+            <textarea id="workflowInput" placeholder="e.g. We are a $5M ARR SaaS company expanding to Germany..." style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-size:14px;min-height:80px;resize:vertical;"></textarea>
+          </div>
+          <button class="run-btn" id="runWorkflowBtn" onclick="runSelectedWorkflow()">
+            ▶ Run Workflow (${selectedWorkflow.stepCount} steps)
+          </button>
+        </div>
+      `;
+      document.getElementById('workflowDetail').innerHTML = detailHtml;
+    }
+
+    async function runSelectedWorkflow() {
+      if (!selectedWorkflow || workflowRunning) return;
+      const input = document.getElementById('workflowInput').value.trim();
+      if (!input) { alert('Describe your situation first'); return; }
+      workflowRunning = true;
+      document.getElementById('runWorkflowBtn').disabled = true;
+      document.getElementById('runWorkflowBtn').textContent = '⏳ Running...';
+
+      const total = selectedWorkflow.steps.length;
+      for (let i = 0; i < total; i++) {
+        const step = selectedWorkflow.steps[i];
+        document.getElementById(`flow-icon-${step.id}`).classList.add('active');
+        showLoading(`Step ${i+1}/${total}: ${step.action.slice(0, 50)}...`);
+      }
+
+      try {
+        const result = await API.runWorkflow(selectedWorkflow.id, input);
+        hideLoading();
+        // Mark all steps and show results
+        if (result.steps) {
+          result.steps.forEach(step => {
+            const icon = document.getElementById(`flow-icon-${step.stepId}`);
+            if (icon) { icon.classList.remove('active'); icon.classList.add('done'); icon.textContent = '✓'; }
+            const resultDiv = document.getElementById(`flow-result-${step.stepId}`);
+            if (resultDiv) {
+              resultDiv.innerHTML = `<div class="flow-step-result">${renderMarkdown(step.result)}</div>`;
+            }
+          });
+        }
+        // Show final result in modal
+        if (result.finalOutput) {
+          showTaskResult(`${selectedWorkflow.name} — Final Recommendation`, result.finalOutput);
+        }
+      } catch (err) {
+        hideLoading();
+        alert('Workflow failed: ' + err.message);
+      }
+
+      workflowRunning = false;
+      const btn = document.getElementById('runWorkflowBtn');
+      if (btn) { btn.disabled = false; btn.textContent = `▶ Run Workflow (${selectedWorkflow.stepCount} steps)`; }
+    }
+
+    // --- Reports View ---
+    function renderReportView() {
+      reportSections = [];
+      const content = `
+        <div class="report-view">
+          <div class="dashboard-header">
+            <h2>Reports</h2>
+            <p>Compile a multi-advisor report. Each advisor contributes a section; a synthesizer writes the executive summary.</p>
+          </div>
+          <div class="task-list-panel" style="margin-bottom:16px;">
+            <h3>📝 Report Configuration</h3>
+            <div class="form-group">
+              <label>Report Title</label>
+              <input type="text" id="reportTitle" placeholder="e.g. Q4 Market Expansion Analysis">
+            </div>
+            <div class="form-group">
+              <label>Subject / Challenge</label>
+              <textarea id="reportSubject" placeholder="Describe the subject being analyzed..." style="min-height:60px;resize:vertical;"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Synthesizer (writes executive summary)</label>
+              <select id="reportSynthesizer" style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:14px;">
+                ${advisors.map(a => `<option value="${a.id}" ${a.id === 'ceo' ? 'selected' : ''}>${a.icon} ${a.name} (${a.shortTitle})</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="task-list-panel" style="margin-bottom:16px;">
+            <h3>👥 Report Sections</h3>
+            <div class="report-add-section">
+              <select id="sectionAgent">
+                ${advisors.map(a => `<option value="${a.id}">${a.icon} ${a.shortTitle}</option>`).join('')}
+              </select>
+              <input type="text" id="sectionQuestion" placeholder="Question for this advisor...">
+              <button onclick="addReportSection()">+ Add</button>
+            </div>
+            <div id="reportSectionsList"></div>
+          </div>
+          <button class="run-btn" onclick="runReport()" style="max-width:300px;margin:0 auto;display:flex;">
+            📑 Generate Report
+          </button>
+        </div>
+      `;
+      document.getElementById('mainContent').innerHTML = content;
+    }
+
+    function addReportSection() {
+      const agentId = document.getElementById('sectionAgent').value;
+      const question = document.getElementById('sectionQuestion').value.trim();
+      if (!question) { alert('Enter a question for this advisor'); return; }
+      const agent = advisors.find(a => a.id === agentId);
+      reportSections.push({ agentId, question });
+      document.getElementById('sectionQuestion').value = '';
+      renderReportSections();
+    }
+
+    function removeReportSection(index) {
+      reportSections.splice(index, 1);
+      renderReportSections();
+    }
+
+    function renderReportSections() {
+      const html = reportSections.map((s, i) => {
+        const agent = advisors.find(a => a.id === s.agentId);
+        return `
+          <div class="report-section-card">
+            <div class="report-section-header">
+              <div class="agent-icon" style="background:${agent.color}22">${agent.icon}</div>
+              <div>
+                <div class="name">${agent.name}</div>
+                <div class="title">${agent.shortTitle}</div>
+              </div>
+              <button class="remove-btn" onclick="removeReportSection(${i})">Remove</button>
+            </div>
+            <div style="font-size:13px;color:var(--text-muted);">${s.question}</div>
+          </div>
+        `;
+      }).join('');
+      document.getElementById('reportSectionsList').innerHTML = html || '<p style="color:var(--text-muted);font-size:13px;">No sections yet. Add advisors and questions above.</p>';
+    }
+
+    async function runReport() {
+      const title = document.getElementById('reportTitle').value.trim();
+      const subject = document.getElementById('reportSubject').value.trim();
+      const synthesizerId = document.getElementById('reportSynthesizer').value;
+      if (!title || !subject) { alert('Provide a title and subject'); return; }
+      if (reportSections.length === 0) { alert('Add at least one report section'); return; }
+      showLoading('Generating report — each advisor contributes, then synthesizes...');
+      try {
+        const report = await API.generateReport(title, subject, reportSections, synthesizerId);
+        hideLoading();
+        if (report.error) throw new Error(report.error);
+        // Build full report markdown
+        let md = `# ${report.title}\n\n**Subject:** ${report.subject}\n**Generated:** ${report.generatedAt}\n\n---\n\n`;
+        md += report.executiveSummary + '\n\n---\n\n';
+        for (const s of report.sections) {
+          md += `## ${s.agent.icon} ${s.agent.name} — ${s.agent.title}\n\n> ${s.question}\n\n${s.content}\n\n`;
+        }
+        showTaskResult(`${title} — Full Report`, md);
+      } catch (err) {
+        hideLoading();
+        alert('Report failed: ' + err.message);
+      }
+    }
     // --- Mobile ---
     function toggleSidebar() {
       document.getElementById('sidebar').classList.toggle('open');
