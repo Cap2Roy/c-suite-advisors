@@ -40,22 +40,55 @@ async function completeWithAPI({ system, prompt, maxTokens }, config) {
     temperature: 0.7,
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const MAX_RETRIES = 4;
+  let lastError;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90000);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`LLM API error ${res.status}: ${text}`);
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        const err = new Error(`LLM API error ${res.status}: ${text}`);
+        // Retry on 503 (service unavailable) or 429 (rate limit)
+        if ((res.status === 503 || res.status === 429) && attempt < MAX_RETRIES) {
+          const delay = Math.min(2000 * Math.pow(2, attempt), 30000); // 2s, 4s, 8s, 16s
+          console.error(`LLM ${res.status}, retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw err;
+      }
+
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content ?? "";
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        err.message = 'LLM API request timed out after 90s';
+      }
+      // Retry on network errors too
+      if (attempt < MAX_RETRIES && err.message?.includes('socket')) {
+        const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
+        console.error(`Network error, retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        lastError = err;
+        continue;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
-
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "";
+  throw lastError || new Error('LLM API exhausted retries');
 }
 
 

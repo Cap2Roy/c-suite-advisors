@@ -1,3 +1,8 @@
+// Prevent server crash on unhandled promise rejections (e.g. network errors to LLM API)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection:', reason?.message || reason);
+});
+
 // Express Server — C-Suite Advisors API
 // Provides chat, task, data, workflow, report, messaging, settings, and memory endpoints.
 
