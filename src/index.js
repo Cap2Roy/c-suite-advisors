@@ -41,6 +41,7 @@ import {
 import {
   registerUser,
   loginUser,
+  loginWithGoogle,
   getUserById,
   verifyAuthToken,
 } from "./services/userStore.js";
@@ -87,6 +88,26 @@ app.post("/api/auth/login", (req, res) => {
     return res.status(401).json({ error: result.error });
   }
   res.json(result);
+});
+
+// Google OAuth login — accepts a Google ID token, creates/finds user, returns session token
+app.post("/api/auth/google", async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) {
+    return res.status(400).json({ error: "Google credential is required" });
+  }
+  const result = await loginWithGoogle(credential);
+  if (result.error) {
+    return res.status(401).json({ error: result.error });
+  }
+  res.json(result);
+});
+
+// Auth config — returns public config needed by the frontend (e.g. Google client ID)
+app.get("/api/auth/config", (req, res) => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+  });
 });
 
 // Check session (validate token)

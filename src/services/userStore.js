@@ -133,6 +133,91 @@ export function verifyAuthToken(token) {
   return verifyToken(token);
 }
 
-export function getUserDataDir(userId) {
-  return path.join(DATA_DIR, `user-${userId}`);
+
+// --- Google OAuth Login ---
+
+/**
+ * Verify a Google ID token and return the user info.
+ * Uses Google's tokeninfo endpoint (no external deps needed).
+ */
+async function verifyGoogleToken(idToken, expectedClientId) {
+  const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const payload = await res.json();
+
+  // Verify the audience matches our client ID
+  if (expectedClientId && payload.aud !== expectedClientId) {
+    return null;
+  }
+
+  // Verify the token is not expired
+  if (payload.exp && Date.now() / 1000 > payload.exp) {
+    return null;
+  }
+
+  return {
+    googleId: payload.sub,
+    email: payload.email?.toLowerCase().trim(),
+    name: payload.name || payload.email?.split("@")[0],
+    emailVerified: payload.email_verified === "true",
+  };
+}
+
+/**
+ * Login or register a user via Google OAuth.
+ * If the user exists (by googleId or email), returns a session token.
+ * If not, creates a new user.
+ */
+export async function loginWithGoogle(idToken) {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    return { error: "Google OAuth is not configured" };
+  }
+
+  const googleUser = await verifyGoogleToken(idToken, clientId);
+  if (!googleUser || !googleUser.email) {
+    return { error: "Invalid Google token" };
+  }
+
+  const data = readUsers();
+
+  // Look for existing user by googleId first, then by email
+  let user = data.users.find((u) => u.googleId === googleUser.googleId);
+  if (!user) {
+    user = data.users.find((u) => u.email === googleUser.email);
+  }
+
+  if (user) {
+    // Update googleId if this is the first Google login for an existing email user
+    if (!user.googleId) {
+      user.googleId = googleUser.googleId;
+      writeUsers(data);
+    }
+  } else {
+    // Create a new user from Google profile
+    user = {
+      id: data.nextId++,
+      email: googleUser.email,
+      name: googleUser.name,
+      googleId: googleUser.googleId,
+      passwordHash: null, // Google users don't have a password
+      createdAt: new Date().toISOString(),
+      tosAccepted: true,
+      tosAcceptedAt: new Date().toISOString(),
+    };
+    data.users.push(user);
+    writeUsers(data);
+
+    // Create per-user data directory
+    const userDir = path.join(DATA_DIR, `user-${user.id}`);
+    if (!fs.existsSync(userDir)) {
+      fs.mkdirSync(userDir, { recursive: true });
+    }
+  }
+
+  return {
+    user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
+    token: generateToken(user.id),
+  };
 }

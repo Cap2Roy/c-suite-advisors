@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -1745,6 +1746,49 @@
       margin-top: 12px;
       min-height: 18px;
     }
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0 16px;
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .google-btn {
+      width: 100%;
+      padding: 12px;
+      background: #fff;
+      color: #1f1f1f;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .google-btn:hover {
+      background: #f5f5f5;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .google-btn img {
+      width: 18px;
+      height: 18px;
+    }
+    .google-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .auth-tos {
       margin: 16px 0;
       font-size: 12px;
@@ -1865,6 +1909,8 @@
         <button type="submit" class="auth-btn" id="registerBtn">Create Account</button>
         <div class="auth-error" id="registerError"></div>
       </form>
+      <div class="auth-divider" id="googleDivider" style="display:none">or</div>
+      <div id="googleBtn" style="display:none"></div>
     </div>
   </div>
 
@@ -2182,11 +2228,67 @@
       }
     }
 
+    // --- Google Sign-In ---
+    let googleClientId = null;
+    let googleInitialized = false;
+
+    async function initGoogleSignIn() {
+      try {
+        const res = await fetch('/api/auth/config').then(r => r.json());
+        googleClientId = res.googleClientId;
+        document.getElementById('googleDivider').style.display = 'flex';
+        document.getElementById('googleBtn').style.display = 'block';
+
+        // Wait for GIS script to load
+        const tryInit = (retries = 0) => {
+          if (window.google && google.accounts && google.accounts.id) {
+            google.accounts.id.initialize({
+              client_id: googleClientId,
+              callback: handleGoogleCredential,
+            });
+            // Render the official Google button in our container
+            google.accounts.id.renderButton(
+              document.getElementById('googleBtn'),
+              { type: 'standard', shape: 'pill', size: 'large', text: 'continue_with', width: 320 }
+            );
+            googleInitialized = true;
+          } else if (retries < 20) {
+            setTimeout(() => tryInit(retries + 1), 200);
+          }
+        };
+        tryInit();
+      } catch {
+        // Google sign-in not available
+      }
+    }
+
+    async function handleGoogleCredential(response) {
+      // GIS callback: response.credential is the ID token (JWT)
+      try {
+        const res = await fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Google login failed');
+        authToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem('csuite_token', data.token);
+        updateUserMenu();
+        hideAuthScreen();
+        await init();
+      } catch (err) {
+        alert('Google login failed: ' + err.message);
+      }
+    }
+
     function handleLogout() {
       authToken = null;
       currentUser = null;
       localStorage.removeItem('csuite_token');
       showAuthScreen();
+      initGoogleSignIn();
     }
 
     function updateUserMenu() {
@@ -2312,6 +2414,7 @@
         await init();
       } else {
         showAuthScreen();
+        initGoogleSignIn();
       }
     })();
 
