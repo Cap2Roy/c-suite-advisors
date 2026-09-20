@@ -1,33 +1,9 @@
-// User Store — Registration, authentication, session management
-// File-based user storage with bcrypt-style password hashing via Node crypto.
-// Each user has isolated data directories for settings, memory, and knowledge files.
+// User Store — Registration, authentication, session management.
+// Backed by Firestore. Session tokens are stateless HMAC-signed (no DB lookup needed for verification).
+// Password hashing via Node crypto (scrypt).
 
-import fs from "fs";
-import path from "path";
 import crypto from "crypto";
-
-const DATA_DIR = path.resolve("data");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
-
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-if (!fs.existsSync(USERS_FILE)) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify({ users: [], nextId: 1 }, null, 2));
-}
-
-function readUsers() {
-  try {
-    return JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
-  } catch {
-    return { users: [], nextId: 1 };
-  }
-}
-
-function writeUsers(data) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2));
-}
+import { collection, getNextUserId } from "./db.js";
 
 // Password hashing using scrypt (Node built-in, no dependencies)
 function hashPassword(password) {
@@ -37,12 +13,13 @@ function hashPassword(password) {
 }
 
 function verifyPassword(password, stored) {
+  if (!stored) return false;
   const [salt, hash] = stored.split(":");
   const testHash = crypto.scryptSync(password, salt, 64).toString("hex");
   return hash === testHash;
 }
 
-// Session token generation
+// Session token generation (stateless — no DB needed to verify)
 function generateToken(userId) {
   const payload = `${userId}:${Date.now()}`;
   const secret = process.env.SESSION_SECRET || "csuite-advisors-secret-key-change-me";
@@ -71,68 +48,86 @@ function verifyToken(token) {
   return parseInt(userId);
 }
 
+// Strip sensitive fields for API responses
+function publicUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    createdAt: user.createdAt,
+  };
+}
+
 // --- Public API ---
 
-export function registerUser(email, password, name) {
-  const data = readUsers();
+export async function registerUser(email, password, name) {
   const normalizedEmail = email.toLowerCase().trim();
 
   // Check if email already exists
-  if (data.users.some((u) => u.email === normalizedEmail)) {
+  const existing = await collection("users")
+    .where("email", "==", normalizedEmail)
+    .limit(1)
+    .get();
+  if (!existing.empty) {
     return { error: "An account with this email already exists" };
   }
 
+  const id = await getNextUserId();
   const user = {
-    id: data.nextId++,
+    id,
     email: normalizedEmail,
     name: name || normalizedEmail.split("@")[0],
     passwordHash: hashPassword(password),
     createdAt: new Date().toISOString(),
-    tosAccepted: true, // ToS acceptance tracked at registration time
+    tosAccepted: true,
     tosAcceptedAt: new Date().toISOString(),
   };
 
-  data.users.push(user);
-  writeUsers(data);
-
-  // Create per-user data directory
-  const userDir = path.join(DATA_DIR, `user-${user.id}`);
-  if (!fs.existsSync(userDir)) {
-    fs.mkdirSync(userDir, { recursive: true });
-  }
+  await collection("users").doc(String(id)).set(user);
 
   return {
-    user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
-    token: generateToken(user.id),
+    user: publicUser(user),
+    token: generateToken(id),
   };
 }
 
-export function loginUser(email, password) {
-  const data = readUsers();
+export async function loginUser(email, password) {
   const normalizedEmail = email.toLowerCase().trim();
-  const user = data.users.find((u) => u.email === normalizedEmail);
+  const snap = await collection("users")
+    .where("email", "==", normalizedEmail)
+    .limit(1)
+    .get();
 
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  if (snap.empty) {
+    return { error: "Invalid email or password" };
+  }
+
+  const user = snap.docs[0].data();
+  if (!verifyPassword(password, user.passwordHash)) {
     return { error: "Invalid email or password" };
   }
 
   return {
-    user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
+    user: publicUser(user),
     token: generateToken(user.id),
   };
 }
 
-export function getUserById(userId) {
-  const data = readUsers();
-  const user = data.users.find((u) => u.id === userId);
-  if (!user) return null;
-  return { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt };
+export async function getUserById(userId) {
+  const doc = await collection("users").doc(String(userId)).get();
+  if (!doc.exists) return null;
+  return publicUser(doc.data());
 }
 
 export function verifyAuthToken(token) {
   return verifyToken(token);
 }
 
+export async function getUserDataDir(userId) {
+  // Kept for backward compat — no longer needed with Firestore,
+  // but some code may reference it. Returns null.
+  return null;
+}
 
 // --- Google OAuth Login ---
 
@@ -180,44 +175,50 @@ export async function loginWithGoogle(idToken) {
     return { error: "Invalid Google token" };
   }
 
-  const data = readUsers();
+  // Look for existing user by googleId first
+  let snap = await collection("users")
+    .where("googleId", "==", googleUser.googleId)
+    .limit(1)
+    .get();
 
-  // Look for existing user by googleId first, then by email
-  let user = data.users.find((u) => u.googleId === googleUser.googleId);
-  if (!user) {
-    user = data.users.find((u) => u.email === googleUser.email);
-  }
-
-  if (user) {
-    // Update googleId if this is the first Google login for an existing email user
-    if (!user.googleId) {
-      user.googleId = googleUser.googleId;
-      writeUsers(data);
-    }
+  let user;
+  if (!snap.empty) {
+    user = snap.docs[0].data();
   } else {
-    // Create a new user from Google profile
-    user = {
-      id: data.nextId++,
-      email: googleUser.email,
-      name: googleUser.name,
-      googleId: googleUser.googleId,
-      passwordHash: null, // Google users don't have a password
-      createdAt: new Date().toISOString(),
-      tosAccepted: true,
-      tosAcceptedAt: new Date().toISOString(),
-    };
-    data.users.push(user);
-    writeUsers(data);
+    // Try by email
+    snap = await collection("users")
+      .where("email", "==", googleUser.email)
+      .limit(1)
+      .get();
 
-    // Create per-user data directory
-    const userDir = path.join(DATA_DIR, `user-${user.id}`);
-    if (!fs.existsSync(userDir)) {
-      fs.mkdirSync(userDir, { recursive: true });
+    if (!snap.empty) {
+      user = snap.docs[0].data();
+      // Update googleId if this is the first Google login for an existing email user
+      if (!user.googleId) {
+        await collection("users").doc(String(user.id)).update({
+          googleId: googleUser.googleId,
+        });
+        user.googleId = googleUser.googleId;
+      }
+    } else {
+      // Create a new user from Google profile
+      const id = await getNextUserId();
+      user = {
+        id,
+        email: googleUser.email,
+        name: googleUser.name,
+        googleId: googleUser.googleId,
+        passwordHash: null,
+        createdAt: new Date().toISOString(),
+        tosAccepted: true,
+        tosAcceptedAt: new Date().toISOString(),
+      };
+      await collection("users").doc(String(id)).set(user);
     }
   }
 
   return {
-    user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
+    user: publicUser(user),
     token: generateToken(user.id),
   };
 }

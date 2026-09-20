@@ -4,7 +4,7 @@
 
 import { verifyAuthToken, getUserById } from "./userStore.js";
 
-export function authRequired(req, res, next) {
+export async function authRequired(req, res, next) {
   // Try Authorization header first
   let token = null;
   const authHeader = req.headers.authorization;
@@ -29,7 +29,7 @@ export function authRequired(req, res, next) {
     return res.status(401).json({ error: "Invalid or expired session" });
   }
 
-  const user = getUserById(userId);
+  const user = await getUserById(userId);
   if (!user) {
     return res.status(401).json({ error: "User not found" });
   }
@@ -39,7 +39,7 @@ export function authRequired(req, res, next) {
 }
 
 // Optional auth — attaches user if token present, but doesn't block
-export function authOptional(req, res, next) {
+export async function authOptional(req, res, next) {
   let token = null;
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -55,7 +55,7 @@ export function authOptional(req, res, next) {
   if (token) {
     const userId = verifyAuthToken(token);
     if (userId) {
-      const user = getUserById(userId);
+      const user = await getUserById(userId);
       if (user) req.user = user;
     }
   }

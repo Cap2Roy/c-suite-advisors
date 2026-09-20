@@ -1,51 +1,15 @@
-// Data Repository Service — User-isolated file-based knowledge store.
-// Each user has their own data directory: data/user-{id}/index.json
+// Data Repository Service — User-isolated knowledge store.
+// Backed by Firestore: users/{userId}/data
 
-import fs from "fs";
-import path from "path";
-
-const DATA_DIR = path.resolve("data");
-
-function getUserDir(userId) {
-  if (!userId) return DATA_DIR;
-  const dir = path.join(DATA_DIR, `user-${userId}`);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
-
-function getStoreFile(userId) {
-  return path.join(getUserDir(userId), "index.json");
-}
-
-function ensureStore(userId) {
-  const storeFile = getStoreFile(userId);
-  if (!fs.existsSync(storeFile)) {
-    fs.writeFileSync(storeFile, JSON.stringify({ files: [], nextId: 1 }, null, 2));
-  }
-}
-
-function readIndex(userId) {
-  ensureStore(userId);
-  try {
-    return JSON.parse(fs.readFileSync(getStoreFile(userId), "utf-8"));
-  } catch {
-    return { files: [], nextId: 1 };
-  }
-}
-
-function writeIndex(userId, index) {
-  fs.writeFileSync(getStoreFile(userId), JSON.stringify(index, null, 2));
-}
+import { userCollection, getNextId } from "./db.js";
 
 /**
  * Add a file to the data repository.
  */
-export function addFile(userId, { originalName, content, mimeType = "text/plain", agentId = null }) {
-  const index = readIndex(userId);
+export async function addFile(userId, { originalName, content, mimeType = "text/plain", agentId = null }) {
+  const id = await getNextId(userId, "data");
   const file = {
-    id: index.nextId++,
+    id,
     originalName,
     content,
     mimeType,
@@ -53,8 +17,7 @@ export function addFile(userId, { originalName, content, mimeType = "text/plain"
     uploadedAt: new Date().toISOString(),
     size: content.length,
   };
-  index.files.push(file);
-  writeIndex(userId, index);
+  await userCollection(userId, "data").doc(String(id)).set(file);
   const { content: _, ...meta } = file;
   return meta;
 }
@@ -62,9 +25,14 @@ export function addFile(userId, { originalName, content, mimeType = "text/plain"
 /**
  * List all files in the repository (metadata only — no content).
  */
-export function listFiles(userId, agentId) {
-  const index = readIndex(userId);
-  let files = index.files.map(({ content, ...meta }) => meta);
+export async function listFiles(userId, agentId) {
+  const snap = await userCollection(userId, "data").get();
+  let files = snap.docs
+    .map((d) => {
+      const { content, ...meta } = d.data();
+      return meta;
+    })
+    .sort((a, b) => (a.uploadedAt || "").localeCompare(b.uploadedAt || ""));
   if (agentId !== undefined) {
     files = files.filter((f) => f.agentId === agentId);
   }
@@ -74,34 +42,35 @@ export function listFiles(userId, agentId) {
 /**
  * Get a single file with content by ID.
  */
-export function getFile(userId, id) {
-  const index = readIndex(userId);
-  return index.files.find((f) => f.id === parseInt(id)) || null;
+export async function getFile(userId, id) {
+  const doc = await userCollection(userId, "data").doc(String(parseInt(id))).get();
+  if (!doc.exists) return null;
+  return doc.data();
 }
 
 /**
  * Delete a file by ID.
  */
-export function deleteFile(userId, id) {
-  const index = readIndex(userId);
-  const filtered = index.files.filter((f) => f.id !== parseInt(id));
-  const deleted = index.files.length !== filtered.length;
-  index.files = filtered;
-  writeIndex(userId, index);
-  return deleted;
+export async function deleteFile(userId, id) {
+  const ref = userCollection(userId, "data").doc(String(parseInt(id)));
+  const doc = await ref.get();
+  if (!doc.exists) return false;
+  await ref.delete();
+  return true;
 }
 
 /**
  * Search files by keyword in name or content.
  */
-export function searchFiles(userId, query) {
-  const index = readIndex(userId);
+export async function searchFiles(userId, query) {
+  const snap = await userCollection(userId, "data").get();
   const q = query.toLowerCase();
-  return index.files
+  return snap.docs
+    .map((d) => d.data())
     .filter(
       (f) =>
         f.originalName.toLowerCase().includes(q) ||
-        f.content.toLowerCase().includes(q)
+        (f.content || "").toLowerCase().includes(q)
     )
     .map(({ content, ...meta }) => meta);
 }
@@ -109,10 +78,12 @@ export function searchFiles(userId, query) {
 /**
  * Build a context string from selected file IDs for inclusion in prompts.
  */
-export function buildContext(userId, ids) {
+export async function buildContext(userId, ids) {
   if (!ids || ids.length === 0) return "";
-  const index = readIndex(userId);
-  const selected = index.files.filter((f) => ids.includes(f.id));
+  const snap = await userCollection(userId, "data").get();
+  const selected = snap.docs
+    .map((d) => d.data())
+    .filter((f) => ids.includes(f.id));
   if (selected.length === 0) return "";
   return selected
     .map((f) => `--- ${f.originalName} ---\n${f.content}`)
@@ -122,10 +93,11 @@ export function buildContext(userId, ids) {
 /**
  * Get repository stats.
  */
-export function getStats(userId) {
-  const index = readIndex(userId);
+export async function getStats(userId) {
+  const snap = await userCollection(userId, "data").get();
+  const files = snap.docs.map((d) => d.data());
   return {
-    fileCount: index.files.length,
-    totalSize: index.files.reduce((sum, f) => sum + (f.size || 0), 0),
+    fileCount: files.length,
+    totalSize: files.reduce((sum, f) => sum + (f.size || 0), 0),
   };
 }

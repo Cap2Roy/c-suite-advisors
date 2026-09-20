@@ -62,7 +62,7 @@ app.use(express.static("public"));
 // --- Auth Routes (no auth required) ---
 
 // Register a new user
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
@@ -70,7 +70,7 @@ app.post("/api/auth/register", (req, res) => {
   if (password.length < 6) {
     return res.status(400).json({ error: "Password must be at least 6 characters" });
   }
-  const result = registerUser(email, password, name);
+  const result = await registerUser(email, password, name);
   if (result.error) {
     return res.status(409).json({ error: result.error });
   }
@@ -78,12 +78,12 @@ app.post("/api/auth/register", (req, res) => {
 });
 
 // Login
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
-  const result = loginUser(email, password);
+  const result = await loginUser(email, password);
   if (result.error) {
     return res.status(401).json({ error: result.error });
   }
@@ -117,13 +117,13 @@ app.get("/api/auth/session", authRequired, (req, res) => {
 
 // --- Settings Routes (auth required) ---
 
-app.get("/api/settings", authRequired, (req, res) => {
-  res.json(getSettings(req.user.id));
+app.get("/api/settings", authRequired, async (req, res) => {
+  res.json(await getSettings(req.user.id));
 });
 
-app.post("/api/settings", authRequired, (req, res) => {
+app.post("/api/settings", authRequired, async (req, res) => {
   const { apiKey, apiBase, model } = req.body;
-  const updated = updateSettings(req.user.id, { apiKey, apiBase, model });
+  const updated = await updateSettings(req.user.id, { apiKey, apiBase, model });
   res.json({
     ok: true,
     hasKey: Boolean(updated.apiKey),
@@ -137,51 +137,59 @@ app.post("/api/settings", authRequired, (req, res) => {
 
 // --- Memory Routes (auth required) ---
 
-app.get("/api/memory/shared", authRequired, (req, res) => {
-  res.json(getSharedMemory(req.user.id));
+app.get("/api/memory/shared", authRequired, async (req, res) => {
+  res.json(await getSharedMemory(req.user.id));
 });
 
-app.post("/api/memory/shared", authRequired, (req, res) => {
+app.post("/api/memory/shared", authRequired, async (req, res) => {
   const { content, createdBy } = req.body;
   if (!content) return res.status(400).json({ error: "content is required" });
-  res.json(addSharedMemory(req.user.id, content, createdBy || req.user.email));
+  res.json(await addSharedMemory(req.user.id, content, createdBy || req.user.email));
 });
 
-app.delete("/api/memory/shared/:id", authRequired, (req, res) => {
-  const ok = deleteSharedMemory(req.user.id, req.params.id);
+app.delete("/api/memory/shared/:id", authRequired, async (req, res) => {
+  const ok = await deleteSharedMemory(req.user.id, req.params.id);
   if (!ok) return res.status(404).json({ error: "Memory entry not found" });
   res.json({ ok: true });
 });
 
-app.get("/api/memory/personal/:agentId", authRequired, (req, res) => {
-  res.json(getPersonalMemory(req.user.id, req.params.agentId));
+app.get("/api/memory/personal/:agentId", authRequired, async (req, res) => {
+  res.json(await getPersonalMemory(req.user.id, req.params.agentId));
 });
 
-app.post("/api/memory/personal/:agentId", authRequired, (req, res) => {
+app.post("/api/memory/personal/:agentId", authRequired, async (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: "content is required" });
-  res.json(addPersonalMemory(req.user.id, req.params.agentId, content));
+  res.json(await addPersonalMemory(req.user.id, req.params.agentId, content));
 });
 
-app.delete("/api/memory/personal/:agentId/:id", authRequired, (req, res) => {
-  const ok = deletePersonalMemory(req.user.id, req.params.agentId, req.params.id);
+app.delete("/api/memory/personal/:agentId/:id", authRequired, async (req, res) => {
+  const ok = await deletePersonalMemory(req.user.id, req.params.agentId, req.params.id);
   if (!ok) return res.status(404).json({ error: "Memory entry not found" });
   res.json({ ok: true });
 });
 
-app.get("/api/memory/stats", authRequired, (req, res) => {
-  res.json(getMemoryStats(req.user.id));
+app.get("/api/memory/stats", authRequired, async (req, res) => {
+  res.json(await getMemoryStats(req.user.id));
 });
 
 // --- Data Repository Routes (auth required) ---
 
-app.get("/api/data", authRequired, (req, res) => {
+app.get("/api/data", authRequired, async (req, res) => {
   const { agentId } = req.query;
-  res.json(listFiles(req.user.id, agentId !== undefined ? agentId : undefined));
+  res.json(await listFiles(req.user.id, agentId !== undefined ? agentId : undefined));
 });
 
-app.get("/api/data/:id", authRequired, (req, res) => {
-  const file = getFile(req.user.id, req.params.id);
+app.get("/api/data/search/:query", authRequired, async (req, res) => {
+  res.json(await searchFiles(req.user.id, decodeURIComponent(req.params.query)));
+});
+
+app.get("/api/data/stats", authRequired, async (req, res) => {
+  res.json(await getDataStats(req.user.id));
+});
+
+app.get("/api/data/:id", authRequired, async (req, res) => {
+  const file = await getFile(req.user.id, req.params.id);
   if (!file) return res.status(404).json({ error: "File not found" });
   res.json(file);
 });
@@ -203,25 +211,17 @@ app.post("/api/data", authRequired, upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "Provide a file or {name, content} in body" });
     }
 
-    const entry = addFile(req.user.id, { originalName, content, mimeType, agentId });
+    const entry = await addFile(req.user.id, { originalName, content, mimeType, agentId });
     res.status(201).json(entry);
   } catch (err) {
     res.status(500).json({ error: "Upload failed", detail: err.message });
   }
 });
 
-app.delete("/api/data/:id", authRequired, (req, res) => {
-  const ok = deleteFile(req.user.id, req.params.id);
+app.delete("/api/data/:id", authRequired, async (req, res) => {
+  const ok = await deleteFile(req.user.id, req.params.id);
   if (!ok) return res.status(404).json({ error: "File not found" });
   res.json({ ok: true });
-});
-
-app.get("/api/data/search/:query", authRequired, (req, res) => {
-  res.json(searchFiles(req.user.id, decodeURIComponent(req.params.query)));
-});
-
-app.get("/api/data/stats", authRequired, (req, res) => {
-  res.json(getDataStats(req.user.id));
 });
 
 // --- Agent Routes (public metadata, auth for chat/task) ---
@@ -271,8 +271,8 @@ app.post("/api/chat", authRequired, async (req, res) => {
       .map((h) => `${h.role === "user" ? "User" : agent.name}: ${h.content}`)
       .join("\n\n");
 
-    const contextBlock = buildContext(req.user.id, contextFileIds);
-    const memoryBlock = buildMemoryContext(req.user.id, agentId);
+    const contextBlock = await buildContext(req.user.id, contextFileIds);
+    const memoryBlock = await buildMemoryContext(req.user.id, agentId);
 
     const prompt = `${contextBlock}${memoryBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
 
@@ -305,8 +305,8 @@ app.post("/api/tasks/run", authRequired, async (req, res) => {
   }
 
   try {
-    const contextBlock = buildContext(req.user.id, contextFileIds);
-    const memoryBlock = buildMemoryContext(req.user.id, agentId);
+    const contextBlock = await buildContext(req.user.id, contextFileIds);
+    const memoryBlock = await buildMemoryContext(req.user.id, agentId);
     const fullContext = contextBlock + memoryBlock;
 
     // Pass a user-scoped complete function to taskRunner

@@ -6,12 +6,14 @@
 import "dotenv/config";
 import { getLLMConfig } from "./settingsStore.js";
 
-export function isLLMConfigured(userId) {
-  return Boolean(getLLMConfig(userId).apiKey);
+export async function isLLMConfigured(userId) {
+  const config = await getLLMConfig(userId);
+  return Boolean(config.apiKey);
 }
 
-export function getLLMModel(userId) {
-  return getLLMConfig(userId).model;
+export async function getLLMModel(userId) {
+  const config = await getLLMConfig(userId);
+  return config.model;
 }
 
 /**
@@ -20,7 +22,7 @@ export function getLLMModel(userId) {
  * @returns {Promise<string>} The assistant's response text.
  */
 export async function complete({ system, prompt, maxTokens = 2000, userId }) {
-  const config = getLLMConfig(userId);
+  const config = await getLLMConfig(userId);
   if (config.apiKey) {
     return completeWithAPI({ system, prompt, maxTokens }, config);
   }

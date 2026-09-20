@@ -1,120 +1,77 @@
 // Memory Service — User-isolated shared + per-advisor memory.
-// Each user has their own memory store: data/user-{id}/memory.json
-//
-// Structure:
-// {
-//   shared: [{ id, content, createdAt, createdBy }],
-//   personal: { [agentId]: [{ id, content, createdAt }] },
-//   nextId: number
-// }
+// Backed by Firestore: users/{userId}/memory/shared, users/{userId}/memory/personal
 
-import fs from "fs";
-import path from "path";
-
-const DATA_DIR = path.resolve("data");
-
-function getUserDir(userId) {
-  if (!userId) return DATA_DIR;
-  const dir = path.join(DATA_DIR, `user-${userId}`);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
-
-function getMemoryFile(userId) {
-  return path.join(getUserDir(userId), "memory.json");
-}
-
-function ensureMemory(userId) {
-  const memFile = getMemoryFile(userId);
-  if (!fs.existsSync(memFile)) {
-    fs.writeFileSync(
-      memFile,
-      JSON.stringify({ shared: [], personal: {}, nextId: 1 }, null, 2)
-    );
-  }
-}
-
-function readMemory(userId) {
-  ensureMemory(userId);
-  try {
-    return JSON.parse(fs.readFileSync(getMemoryFile(userId), "utf-8"));
-  } catch {
-    return { shared: [], personal: {}, nextId: 1 };
-  }
-}
-
-function writeMemory(userId, memory) {
-  fs.writeFileSync(getMemoryFile(userId), JSON.stringify(memory, null, 2));
-}
+import { userCollection, getNextId } from "./db.js";
 
 // --- Shared Memory ---
 
-export function getSharedMemory(userId) {
-  return readMemory(userId).shared;
+export async function getSharedMemory(userId) {
+  const snap = await userCollection(userId, "memory_shared").get();
+  return snap.docs
+    .map((d) => ({ id: parseInt(d.id), ...d.data() }))
+    .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
 }
 
-export function addSharedMemory(userId, content, createdBy = "user") {
-  const memory = readMemory(userId);
+export async function addSharedMemory(userId, content, createdBy = "user") {
+  const id = await getNextId(userId, "memory_shared");
   const entry = {
-    id: memory.nextId++,
     content,
     createdAt: new Date().toISOString(),
     createdBy,
   };
-  memory.shared.push(entry);
-  writeMemory(userId, memory);
-  return entry;
+  await userCollection(userId, "memory_shared").doc(String(id)).set(entry);
+  return { id, ...entry };
 }
 
-export function deleteSharedMemory(userId, id) {
-  const memory = readMemory(userId);
-  const before = memory.shared.length;
-  memory.shared = memory.shared.filter((m) => m.id !== parseInt(id));
-  const deleted = before !== memory.shared.length;
-  writeMemory(userId, memory);
-  return deleted;
+export async function deleteSharedMemory(userId, id) {
+  const ref = userCollection(userId, "memory_shared").doc(String(parseInt(id)));
+  const doc = await ref.get();
+  if (!doc.exists) return false;
+  await ref.delete();
+  return true;
 }
 
 // --- Personal Memory (per advisor) ---
 
-export function getPersonalMemory(userId, agentId) {
-  const memory = readMemory(userId);
-  return memory.personal[agentId] || [];
+export async function getPersonalMemory(userId, agentId) {
+  const snap = await userCollection(userId, "memory_personal")
+    .where("agentId", "==", agentId)
+    .get();
+  return snap.docs
+    .map((d) => ({ id: parseInt(d.id), ...d.data(), agentId: undefined }))
+    .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
 }
 
-export function addPersonalMemory(userId, agentId, content) {
-  const memory = readMemory(userId);
-  if (!memory.personal[agentId]) memory.personal[agentId] = [];
+export async function addPersonalMemory(userId, agentId, content) {
+  const id = await getNextId(userId, "memory_personal");
   const entry = {
-    id: memory.nextId++,
     content,
     createdAt: new Date().toISOString(),
+    agentId,
   };
-  memory.personal[agentId].push(entry);
-  writeMemory(userId, memory);
-  return entry;
+  await userCollection(userId, "memory_personal").doc(String(id)).set(entry);
+  return { id, content, createdAt: entry.createdAt };
 }
 
-export function deletePersonalMemory(userId, agentId, id) {
-  const memory = readMemory(userId);
-  if (!memory.personal[agentId]) return false;
-  const before = memory.personal[agentId].length;
-  memory.personal[agentId] = memory.personal[agentId].filter(
-    (m) => m.id !== parseInt(id)
-  );
-  const deleted = before !== memory.personal[agentId].length;
-  writeMemory(userId, memory);
-  return deleted;
+export async function deletePersonalMemory(userId, agentId, id) {
+  const ref = userCollection(userId, "memory_personal").doc(String(parseInt(id)));
+  const doc = await ref.get();
+  if (!doc.exists) return false;
+  // Verify it belongs to this agent
+  const data = doc.data();
+  if (data.agentId !== agentId) return false;
+  await ref.delete();
+  return true;
 }
 
 // --- Memory Context for Prompts ---
 
-export function buildMemoryContext(userId, agentId) {
-  const memory = readMemory(userId);
-  const shared = memory.shared;
-  const personal = memory.personal[agentId] || [];
+export async function buildMemoryContext(userId, agentId) {
+  const [shared, personal] = await Promise.all([
+    getSharedMemory(userId),
+    getPersonalMemory(userId, agentId),
+  ]);
+
   let context = "";
 
   if (shared.length > 0) {
@@ -141,18 +98,26 @@ export function buildMemoryContext(userId, agentId) {
 /**
  * Get all memory stats.
  */
-export function getMemoryStats(userId) {
-  const memory = readMemory(userId);
-  const personalCount = Object.values(memory.personal).reduce(
-    (sum, entries) => sum + entries.length,
-    0
-  );
+export async function getMemoryStats(userId) {
+  const [sharedSnap, personalSnap] = await Promise.all([
+    userCollection(userId, "memory_shared").get(),
+    userCollection(userId, "memory_personal").get(),
+  ]);
+
+  const sharedCount = sharedSnap.size;
+  const personalCount = personalSnap.size;
+
+  // Count unique agents with memory
+  const agentsWithMemory = new Set();
+  personalSnap.forEach((doc) => {
+    const data = doc.data();
+    if (data.agentId) agentsWithMemory.add(data.agentId);
+  });
+
   return {
-    sharedCount: memory.shared.length,
+    sharedCount,
     personalCount,
-    total: memory.shared.length + personalCount,
-    advisorsWithMemory: Object.keys(memory.personal).filter(
-      (k) => memory.personal[k].length > 0
-    ).length,
+    total: sharedCount + personalCount,
+    advisorsWithMemory: agentsWithMemory.size,
   };
 }
