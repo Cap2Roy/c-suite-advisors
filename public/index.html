@@ -2962,6 +2962,7 @@
           <div class="dashboard-header">
             <h2>Knowledge Base</h2>
             <p>Upload reference documents that advisors can use as context during chats and tasks.</p>
+            <button class="btn" style="margin-top:8px;font-size:13px" onclick="seedKnowledge()">🌱 Seed Sample Knowledge</button>
           </div>
           <div class="kb-upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
             <div class="upload-icon">📤</div>
@@ -3025,6 +3026,25 @@
       } catch (err) {
         hideLoading();
         alert('Upload failed: ' + err.message);
+      }
+    }
+
+    async function seedKnowledge() {
+      if (!confirm('Add sample knowledge files about BetterAI360? This won\'t duplicate files that already exist.')) return;
+      showLoading('Seeding knowledge...');
+      try {
+        const result = await apiJson('/api/seed-knowledge', { method: 'POST' });
+        knowledgeFiles = await API.getKnowledge();
+        hideLoading();
+        renderKnowledgeView();
+        if (result.seeded > 0) {
+          alert(`Added ${result.seeded} sample file(s).${result.skipped > 0 ? ` (${result.skipped} already existed)` : ''}`);
+        } else {
+          alert('All sample files already exist in your knowledge base.');
+        }
+      } catch (err) {
+        hideLoading();
+        alert('Failed to seed: ' + err.message);
       }
     }
 
@@ -3390,8 +3410,15 @@
     function renderAdvisorTabContent(tab, ctx) {
       const { advisor, tasksHtml, filesHtml, memHtml, sharedMemHtml, expertiseHtml, capsHtml, agentFiles } = ctx;
       if (tab === 'chat') {
+        const backgroundHtml = advisor.background
+          ? `<div style="margin-bottom:20px;padding:16px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--border)">
+              <div style="margin-bottom:8px"><strong style="font-size:12px;color:var(--text-dim)">BACKGROUND</strong></div>
+              <div style="font-size:14px;line-height:1.7;color:var(--text)">${renderMarkdown(advisor.background)}</div>
+            </div>`
+          : '';
         return `
           <div class="card">
+            ${backgroundHtml}
             <h3>Expertise & Capabilities</h3>
             <div style="margin-bottom:12px"><strong style="font-size:12px;color:var(--text-dim)">EXPERTISE</strong></div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">${expertiseHtml}</div>
@@ -3496,6 +3523,10 @@
               <label>System Prompt <span style="font-weight:400;color:var(--text-dim)">(the advisor's CV / personality)</span></label>
               <textarea id="edit-systemPrompt" rows="12" style="font-family:monospace;font-size:13px;line-height:1.5" placeholder="Define the advisor's personality, background, communication style, and approach...">${escapeHtml(advisor.systemPrompt || '')}</textarea>
             </div>
+            <div class="form-group">
+              <label>Background & Bio <span style="font-weight:400;color:var(--text-dim)">(career history, education, achievements — shown in profile and injected into advisor's context)</span></label>
+              <textarea id="edit-background" rows="10" style="font-size:13px;line-height:1.5" placeholder="Career history, education, notable achievements, personality, and personal details that make this advisor unique...">${escapeHtml(advisor.background || '')}</textarea>
+            </div>
             <div style="display:flex;gap:8px;margin-top:16px">
               <button class="btn btn-primary" onclick="saveAdvisorEdit('${advisor.id}', ${isCustom})">💾 Save Changes</button>
               ${isCustom
@@ -3533,6 +3564,7 @@
         expertise: get('edit-expertise').split(',').map(s => s.trim()).filter(Boolean),
         capabilities: get('edit-capabilities').split(',').map(s => s.trim()).filter(Boolean),
         systemPrompt: get('edit-systemPrompt'),
+        background: get('edit-background'),
       };
       showLoading('Saving advisor profile...');
       try {

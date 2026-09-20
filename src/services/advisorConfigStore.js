@@ -36,7 +36,7 @@ export async function getAllAdvisorConfigs(userId) {
  * Save built-in advisor config overrides (full replace).
  * @param {string} userId
  * @param {string} agentId
- * @param {object} config - { name, title, tagline, expertise, systemPrompt, capabilities }
+ * @param {object} config - { name, title, tagline, background, expertise, systemPrompt, capabilities }
  */
 export async function saveAdvisorConfig(userId, agentId, config) {
   const clean = {};

@@ -36,6 +36,7 @@ import { generateReport, formatReportAsMarkdown } from "./services/reportGenerat
 import { workflows, executeWorkflow } from "./services/workflows.js";
 import { runSimulation } from "./services/simulationRunner.js";
 import { searchWeb, formatSearchContext, extractSearchQuery } from "./services/webSearch.js";
+import { SEED_KNOWLEDGE_FILES } from "./services/seedData.js";
 import {
   getSettings,
   updateSettings,
@@ -86,6 +87,16 @@ app.post("/api/auth/register", async (req, res) => {
   if (result.error) {
     return res.status(409).json({ error: result.error });
   }
+  // Seed default knowledge files for the new user
+  if (result.user?.id) {
+    for (const file of SEED_KNOWLEDGE_FILES) {
+      try {
+        await addFile(result.user.id, { originalName: file.name, content: file.content });
+      } catch (err) {
+        console.error("Failed to seed knowledge file:", file.name, err.message);
+      }
+    }
+  }
   res.status(201).json(result);
 });
 
@@ -112,6 +123,16 @@ app.post("/api/auth/google", async (req, res) => {
   if (result.error) {
     return res.status(401).json({ error: result.error });
   }
+  // Seed default knowledge files for new Google users
+  if (result.isNew && result.user?.id) {
+    for (const file of SEED_KNOWLEDGE_FILES) {
+      try {
+        await addFile(result.user.id, { originalName: file.name, content: file.content });
+      } catch (err) {
+        console.error("Failed to seed knowledge file:", file.name, err.message);
+      }
+    }
+  }
   res.json(result);
 });
 
@@ -125,6 +146,25 @@ app.get("/api/auth/config", (req, res) => {
 // Check session (validate token)
 app.get("/api/auth/session", authRequired, (req, res) => {
   res.json({ user: req.user });
+});
+
+// Seed default knowledge files for existing users (one-time, idempotent)
+app.post("/api/seed-knowledge", authRequired, async (req, res) => {
+  try {
+    const existing = await listFiles(req.user.id);
+    const existingNames = new Set(existing.map((f) => f.originalName));
+    let seeded = 0;
+    for (const file of SEED_KNOWLEDGE_FILES) {
+      if (!existingNames.has(file.name)) {
+        await addFile(req.user.id, { originalName: file.name, content: file.content });
+        seeded++;
+      }
+    }
+    res.json({ seeded, skipped: SEED_KNOWLEDGE_FILES.length - seeded });
+  } catch (err) {
+    console.error("Seed knowledge error:", err.message);
+    res.status(500).json({ error: "Failed to seed knowledge files" });
+  }
 });
 
 // --- Settings Routes (auth required) ---
@@ -252,6 +292,7 @@ app.get("/api/agents", authOptional, async (req, res) => {
     icon: a.icon,
     color: a.color,
     tagline: a.tagline,
+    background: a.background || "",
     expertise: a.expertise,
     capabilities: a.capabilities,
     taskCount: (a.tasks || []).length,
@@ -333,8 +374,12 @@ app.post("/api/chat", authRequired, async (req, res) => {
 
     const prompt = `${contextBlock}${memoryBlock}${searchBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
 
+    const systemPrompt = agent.background
+      ? `${agent.systemPrompt}\n\n--- Advisor Background ---\n${agent.background}`
+      : agent.systemPrompt;
+
     const response = await complete({
-      system: agent.systemPrompt,
+      system: systemPrompt,
       prompt,
       maxTokens: 2000,
       userId: req.user.id,

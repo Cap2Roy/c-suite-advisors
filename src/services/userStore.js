@@ -182,6 +182,7 @@ export async function loginWithGoogle(idToken) {
     .get();
 
   let user;
+  let isNewUser = false;
   if (!snap.empty) {
     user = snap.docs[0].data();
   } else {
@@ -214,11 +215,13 @@ export async function loginWithGoogle(idToken) {
         tosAcceptedAt: new Date().toISOString(),
       };
       await collection("users").doc(String(id)).set(user);
+      isNewUser = true;
     }
   }
 
   return {
     user: publicUser(user),
     token: generateToken(user.id),
+    isNew: isNewUser,
   };
 }

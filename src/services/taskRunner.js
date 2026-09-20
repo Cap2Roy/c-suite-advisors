@@ -59,8 +59,12 @@ export async function runTask(agentId, taskId, inputValues, llmClient, contextBl
 
   const prompt = buildTaskPrompt(agent, task, inputValues, contextBlock);
 
+  const systemPrompt = agent.background
+    ? `${agent.systemPrompt}\n\n--- Advisor Background ---\n${agent.background}`
+    : agent.systemPrompt;
+
   const result = await llmClient.complete({
-    system: agent.systemPrompt,
+    system: systemPrompt,
     prompt,
     maxTokens: 4000,
   });
