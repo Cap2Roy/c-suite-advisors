@@ -35,6 +35,7 @@ import { sendMessage, runDiscussion, MessageType } from "./services/orchestrator
 import { generateReport, formatReportAsMarkdown } from "./services/reportGenerator.js";
 import { workflows, executeWorkflow } from "./services/workflows.js";
 import { runSimulation } from "./services/simulationRunner.js";
+import { searchWeb, formatSearchContext, extractSearchQuery } from "./services/webSearch.js";
 import {
   getSettings,
   updateSettings,
@@ -293,7 +294,7 @@ app.get("/api/tasks", authOptional, async (req, res) => {
 
 // Chat with an advisor — auth required, user-scoped memory/context
 app.post("/api/chat", authRequired, async (req, res) => {
-  const { agentId, message, history = [], contextFileIds = [] } = req.body;
+  const { agentId, message, history = [], contextFileIds = [], webSearch = false } = req.body;
 
   if (!agentId || !message) {
     return res.status(400).json({ error: "agentId and message are required" });
@@ -312,7 +313,25 @@ app.post("/api/chat", authRequired, async (req, res) => {
     const contextBlock = await buildContext(req.user.id, contextFileIds);
     const memoryBlock = await buildMemoryContext(req.user.id, agentId);
 
-    const prompt = `${contextBlock}${memoryBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
+    // Web search: if enabled, search the web and inject results as context
+    let searchBlock = "";
+    let searchResults = null;
+    if (webSearch) {
+      try {
+        const query = extractSearchQuery(message);
+        const searchResult = await searchWeb(query);
+        searchResults = searchResult.results;
+        searchBlock = formatSearchContext(searchResult.results);
+        if (searchResult.results.length > 0) {
+          searchBlock = `\nYou have access to real-time web search results. Use the following search results to inform your response. Cite sources where relevant.\n${searchBlock}`;
+        }
+      } catch (err) {
+        console.error("Web search failed:", err.message);
+        // Continue without search results — don't block the chat
+      }
+    }
+
+    const prompt = `${contextBlock}${memoryBlock}${searchBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
 
     const response = await complete({
       system: agent.systemPrompt,
@@ -326,6 +345,8 @@ app.post("/api/chat", authRequired, async (req, res) => {
       agentName: agent.name,
       agentTitle: agent.shortTitle,
       response,
+      webSearchUsed: webSearch && searchResults !== null,
+      webSearchResults: searchResults,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
@@ -336,7 +357,7 @@ app.post("/api/chat", authRequired, async (req, res) => {
 
 // Run a structured task — auth required, user-scoped
 app.post("/api/tasks/run", authRequired, async (req, res) => {
-  const { agentId, taskId, inputs = {}, contextFileIds = [] } = req.body;
+  const { agentId, taskId, inputs = {}, contextFileIds = [], webSearch = false } = req.body;
 
   if (!agentId || !taskId) {
     return res.status(400).json({ error: "agentId and taskId are required" });
@@ -350,7 +371,25 @@ app.post("/api/tasks/run", authRequired, async (req, res) => {
 
     const contextBlock = await buildContext(req.user.id, contextFileIds);
     const memoryBlock = await buildMemoryContext(req.user.id, agentId);
-    const fullContext = contextBlock + memoryBlock;
+
+    // Web search: if enabled, build a search query from task inputs
+    let searchBlock = "";
+    if (webSearch) {
+      try {
+        const inputValues = Object.values(inputs).filter(Boolean).join(" ");
+        const taskDesc = agent.tasks?.find((t) => t.id === taskId)?.name || taskId;
+        const query = extractSearchQuery(`${taskDesc} ${inputValues}`.trim());
+        const searchResult = await searchWeb(query);
+        searchBlock = formatSearchContext(searchResult.results);
+        if (searchResult.results.length > 0) {
+          searchBlock = `\nYou have access to real-time web search results. Use them to inform your analysis. Cite sources where relevant.\n${searchBlock}`;
+        }
+      } catch (err) {
+        console.error("Web search for task failed:", err.message);
+      }
+    }
+
+    const fullContext = contextBlock + memoryBlock + searchBlock;
 
     // Pass a user-scoped complete function to taskRunner
     const userLLM = {
@@ -559,6 +598,23 @@ app.post("/api/simulations/run", authRequired, async (req, res) => {
   } catch (err) {
     console.error("Simulation error:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Web Search (auth required) ---
+
+// POST /api/web-search — search the web for real-time information
+app.post("/api/web-search", authRequired, async (req, res) => {
+  const { query, maxResults = 5 } = req.body;
+  if (!query || !query.trim()) {
+    return res.status(400).json({ error: "query is required" });
+  }
+  try {
+    const result = await searchWeb(query.trim(), maxResults);
+    res.json(result);
+  } catch (err) {
+    console.error("Web search error:", err.message);
+    res.status(500).json({ error: "Web search failed", detail: err.message });
   }
 });
 

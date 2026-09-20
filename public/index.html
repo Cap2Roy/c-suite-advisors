@@ -2050,6 +2050,7 @@
     let currentDetailTab = 'chat';
     let authToken = null;
     let currentUser = null;
+    let webSearchEnabled = false;
 
     // --- Auth helpers ---
     function authHeaders() {
@@ -2079,17 +2080,17 @@
       getWorkflows: () => apiJson('/api/workflows'),
       getKnowledge: () => apiJson('/api/data'),
       getKnowledgeByAgent: (agentId) => apiJson(`/api/data?agentId=${agentId}`),
-      chat: (agentId, message, history, contextFileIds) =>
+      chat: (agentId, message, history, contextFileIds, webSearch = false) =>
         apiJson('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId, message, history, contextFileIds }),
+          body: JSON.stringify({ agentId, message, history, contextFileIds, webSearch }),
         }),
-      runTask: (agentId, taskId, inputs, contextFileIds) =>
+      runTask: (agentId, taskId, inputs, contextFileIds, webSearch = false) =>
         apiJson('/api/tasks/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agentId, taskId, inputs, contextFileIds }),
+          body: JSON.stringify({ agentId, taskId, inputs, contextFileIds, webSearch }),
         }),
       uploadFile: (name, content, agentId) =>
         apiJson('/api/data', {
@@ -2185,6 +2186,13 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scenario, agentIds, synthesizerId }),
+        }),
+      // Web Search
+      webSearch: (query, maxResults = 5) =>
+        apiJson('/api/web-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, maxResults }),
         }),
     };
 
@@ -2677,6 +2685,10 @@
               </div>
             ` : ''}
             <div class="chat-input-wrapper">
+              <label class="web-search-toggle" style="display:flex;align-items:center;gap:6px;padding:0 8px;cursor:pointer;white-space:nowrap;font-size:13px;color:var(--text-muted)" title="Search the web for real-time information before responding">
+                <input type="checkbox" id="webSearchToggle" onchange="webSearchEnabled=this.checked" ${webSearchEnabled ? 'checked' : ''}>
+                <span>🌐 Web</span>
+              </label>
               <textarea class="chat-input" id="chatInput" placeholder="Ask ${advisor.name} anything..." rows="1"
                 onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
               <button class="send-btn" onclick="sendMessage()">➤</button>
@@ -2730,11 +2742,20 @@
       scrollMessages();
 
       try {
-        const res = await API.chat(currentAdvisor.id, message, history.slice(0, -1), chatContextFiles);
+        const res = await API.chat(currentAdvisor.id, message, history.slice(0, -1), chatContextFiles, webSearchEnabled);
         document.getElementById('typingIndicator')?.remove();
         if (res.error) throw new Error(res.error);
-        chatHistory[currentAdvisor.id].push({ role: 'assistant', content: res.response });
-        appendMessage({ role: 'assistant', content: res.response }, currentAdvisor);
+        let responseText = res.response;
+        // Append web search sources if available
+        if (res.webSearchUsed && res.webSearchResults && res.webSearchResults.length > 0) {
+          const sourcesHtml = res.webSearchResults.map((r, i) => {
+            if (r.url) return `[${i + 1}] [${r.title}](${r.url})`;
+            return `[${i + 1}] ${r.title}`;
+          }).join('\n');
+          responseText += `\n\n---\n**🌐 Web Sources:**\n${sourcesHtml}`;
+        }
+        chatHistory[currentAdvisor.id].push({ role: 'assistant', content: responseText });
+        appendMessage({ role: 'assistant', content: responseText }, currentAdvisor);
       } catch (err) {
         document.getElementById('typingIndicator')?.remove();
         appendMessage({ role: 'assistant', content: `⚠️ Error: ${err.message}` }, currentAdvisor);
@@ -2847,6 +2868,10 @@
             <textarea data-input="${input}" placeholder="Enter ${input.toLowerCase()}..."></textarea>
           </div>
         `).join('')}
+        <label class="web-search-toggle" style="display:flex;align-items:center;gap:6px;margin:12px 0;cursor:pointer;font-size:13px;color:var(--text-muted)" title="Search the web for real-time information">
+          <input type="checkbox" id="taskWebSearchToggle">
+          <span>🌐 Web Search — include real-time web results</span>
+        </label>
         <button class="run-btn" onclick="executeTask()">
           ▶ Run Task
         </button>
@@ -2860,11 +2885,12 @@
       document.querySelectorAll('[data-input]').forEach(el => {
         inputs[el.dataset.input] = el.value;
       });
+      const useWebSearch = document.getElementById('taskWebSearchToggle')?.checked || false;
 
-      showLoading(`${selectedTask.agent.name} is working on "${selectedTask.task.name}"...`);
+      showLoading(`${selectedTask.agent.name} is working on "${selectedTask.task.name}"${useWebSearch ? ' (with web search)' : ''}...`);
 
       try {
-        const res = await API.runTask(selectedTask.agentId, selectedTask.taskId, inputs);
+        const res = await API.runTask(selectedTask.agentId, selectedTask.taskId, inputs, [], useWebSearch);
         hideLoading();
         if (res.error) throw new Error(res.error);
         showTaskResult(selectedTask.task.name, res.result);
@@ -3939,6 +3965,22 @@
             </div>
             <button class="settings-save-btn" id="settingsSaveBtn" onclick="saveSettings()">Save Settings</button>
             <span id="settingsSavedMsg" style="margin-left:12px;font-size:13px;color:var(--success)"></span>
+          </div>
+          <div class="settings-panel">
+            <h3>🌐 Web Search</h3>
+            <p class="text-muted" style="font-size:13px;line-height:1.6;margin-bottom:12px">
+              Advisors can search the web for real-time information when responding. Enable the <strong>🌐 Web</strong> toggle in any chat to include web results as context.
+            </p>
+            <div class="settings-form-group">
+              <div class="hint" style="font-size:13px">
+                <strong>How it works:</strong> When enabled, the advisor searches the web for your query, injects the top results as context, and uses them to inform its response. Sources are cited at the bottom of the reply.
+              </div>
+            </div>
+            <div class="settings-form-group">
+              <div class="hint" style="font-size:13px;color:var(--text-muted)">
+                Uses DuckDuckGo by default (no configuration needed). For higher-quality results, set <code>TAVILY_API_KEY</code> in the server environment.
+              </div>
+            </div>
           </div>
           <div class="settings-panel">
             <h3>📄 Legal Documents</h3>
