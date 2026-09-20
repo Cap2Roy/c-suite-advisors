@@ -4,7 +4,8 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Express Server — C-Suite Advisors API
-// Provides chat, task, data, workflow, report, messaging, settings, and memory endpoints.
+// User-authenticated: every user has isolated settings, memory, and knowledge.
+// Company: BetterAI360
 
 import express from "express";
 import multer from "multer";
@@ -37,6 +38,13 @@ import {
   buildMemoryContext,
   getMemoryStats,
 } from "./services/memoryStore.js";
+import {
+  registerUser,
+  loginUser,
+  getUserById,
+  verifyAuthToken,
+} from "./services/userStore.js";
+import { authRequired } from "./services/authMiddleware.js";
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
@@ -50,17 +58,51 @@ const upload = multer({
 // Serve static files
 app.use(express.static("public"));
 
-// --- Settings Routes ---
+// --- Auth Routes (no auth required) ---
 
-// Get current LLM settings (API key masked)
-app.get("/api/settings", (req, res) => {
-  res.json(getSettings());
+// Register a new user
+app.post("/api/auth/register", (req, res) => {
+  const { email, password, name } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  }
+  const result = registerUser(email, password, name);
+  if (result.error) {
+    return res.status(409).json({ error: result.error });
+  }
+  res.status(201).json(result);
 });
 
-// Update LLM settings
-app.post("/api/settings", (req, res) => {
+// Login
+app.post("/api/auth/login", (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+  const result = loginUser(email, password);
+  if (result.error) {
+    return res.status(401).json({ error: result.error });
+  }
+  res.json(result);
+});
+
+// Check session (validate token)
+app.get("/api/auth/session", authRequired, (req, res) => {
+  res.json({ user: req.user });
+});
+
+// --- Settings Routes (auth required) ---
+
+app.get("/api/settings", authRequired, (req, res) => {
+  res.json(getSettings(req.user.id));
+});
+
+app.post("/api/settings", authRequired, (req, res) => {
   const { apiKey, apiBase, model } = req.body;
-  const updated = updateSettings({ apiKey, apiBase, model });
+  const updated = updateSettings(req.user.id, { apiKey, apiBase, model });
   res.json({
     ok: true,
     hasKey: Boolean(updated.apiKey),
@@ -72,68 +114,58 @@ app.post("/api/settings", (req, res) => {
   });
 });
 
-// --- Memory Routes ---
+// --- Memory Routes (auth required) ---
 
-// Get all shared memory
-app.get("/api/memory/shared", (req, res) => {
-  res.json(getSharedMemory());
+app.get("/api/memory/shared", authRequired, (req, res) => {
+  res.json(getSharedMemory(req.user.id));
 });
 
-// Add shared memory
-app.post("/api/memory/shared", (req, res) => {
+app.post("/api/memory/shared", authRequired, (req, res) => {
   const { content, createdBy } = req.body;
   if (!content) return res.status(400).json({ error: "content is required" });
-  res.json(addSharedMemory(content, createdBy));
+  res.json(addSharedMemory(req.user.id, content, createdBy || req.user.email));
 });
 
-// Delete shared memory
-app.delete("/api/memory/shared/:id", (req, res) => {
-  const ok = deleteSharedMemory(req.params.id);
+app.delete("/api/memory/shared/:id", authRequired, (req, res) => {
+  const ok = deleteSharedMemory(req.user.id, req.params.id);
   if (!ok) return res.status(404).json({ error: "Memory entry not found" });
   res.json({ ok: true });
 });
 
-// Get personal memory for an advisor
-app.get("/api/memory/personal/:agentId", (req, res) => {
-  res.json(getPersonalMemory(req.params.agentId));
+app.get("/api/memory/personal/:agentId", authRequired, (req, res) => {
+  res.json(getPersonalMemory(req.user.id, req.params.agentId));
 });
 
-// Add personal memory for an advisor
-app.post("/api/memory/personal/:agentId", (req, res) => {
+app.post("/api/memory/personal/:agentId", authRequired, (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: "content is required" });
-  res.json(addPersonalMemory(req.params.agentId, content));
+  res.json(addPersonalMemory(req.user.id, req.params.agentId, content));
 });
 
-// Delete personal memory
-app.delete("/api/memory/personal/:agentId/:id", (req, res) => {
-  const ok = deletePersonalMemory(req.params.agentId, req.params.id);
+app.delete("/api/memory/personal/:agentId/:id", authRequired, (req, res) => {
+  const ok = deletePersonalMemory(req.user.id, req.params.agentId, req.params.id);
   if (!ok) return res.status(404).json({ error: "Memory entry not found" });
   res.json({ ok: true });
 });
 
-// Get memory stats
-app.get("/api/memory/stats", (req, res) => {
-  res.json(getMemoryStats());
+app.get("/api/memory/stats", authRequired, (req, res) => {
+  res.json(getMemoryStats(req.user.id));
 });
 
-// --- Data Repository Routes ---
+// --- Data Repository Routes (auth required) ---
 
-// List all files (optionally filter by agentId)
-app.get("/api/data", (req, res) => {
+app.get("/api/data", authRequired, (req, res) => {
   const { agentId } = req.query;
-  res.json(listFiles(agentId !== undefined ? agentId : undefined));
+  res.json(listFiles(req.user.id, agentId !== undefined ? agentId : undefined));
 });
 
-// Get a single file with content
-app.get("/api/data/:id", (req, res) => {
-  const file = getFile(req.params.id);
+app.get("/api/data/:id", authRequired, (req, res) => {
+  const file = getFile(req.user.id, req.params.id);
   if (!file) return res.status(404).json({ error: "File not found" });
   res.json(file);
 });
 
-// Upload a file (text content) to the knowledge base
-app.post("/api/data", upload.single("file"), async (req, res) => {
+app.post("/api/data", authRequired, upload.single("file"), async (req, res) => {
   try {
     let originalName, content, mimeType;
     const agentId = req.body.agentId || null;
@@ -150,33 +182,29 @@ app.post("/api/data", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "Provide a file or {name, content} in body" });
     }
 
-    const entry = addFile({ originalName, content, mimeType, agentId });
+    const entry = addFile(req.user.id, { originalName, content, mimeType, agentId });
     res.status(201).json(entry);
   } catch (err) {
     res.status(500).json({ error: "Upload failed", detail: err.message });
   }
 });
 
-// Delete a file
-app.delete("/api/data/:id", (req, res) => {
-  const ok = deleteFile(req.params.id);
+app.delete("/api/data/:id", authRequired, (req, res) => {
+  const ok = deleteFile(req.user.id, req.params.id);
   if (!ok) return res.status(404).json({ error: "File not found" });
   res.json({ ok: true });
 });
 
-// Search files
-app.get("/api/data/search/:query", (req, res) => {
-  res.json(searchFiles(decodeURIComponent(req.params.query)));
+app.get("/api/data/search/:query", authRequired, (req, res) => {
+  res.json(searchFiles(req.user.id, decodeURIComponent(req.params.query)));
 });
 
-// Get data stats
-app.get("/api/data/stats", (req, res) => {
-  res.json(getDataStats());
+app.get("/api/data/stats", authRequired, (req, res) => {
+  res.json(getDataStats(req.user.id));
 });
 
-// --- Agent Routes ---
+// --- Agent Routes (public metadata, auth for chat/task) ---
 
-// List all advisors (metadata only — no system prompts)
 app.get("/api/agents", (req, res) => {
   const summary = agents.map((a) => ({
     id: a.id,
@@ -193,7 +221,6 @@ app.get("/api/agents", (req, res) => {
   res.json(summary);
 });
 
-// Get a single advisor's details including tasks
 app.get("/api/agents/:id", (req, res) => {
   const agent = getAgentById(req.params.id);
   if (!agent) return res.status(404).json({ error: "Advisor not found" });
@@ -201,13 +228,12 @@ app.get("/api/agents/:id", (req, res) => {
   res.json(publicData);
 });
 
-// Get all tasks grouped by advisor
 app.get("/api/tasks", (req, res) => {
   res.json(getAllTasks());
 });
 
-// Chat with an advisor — supports optional data context files and memory
-app.post("/api/chat", async (req, res) => {
+// Chat with an advisor — auth required, user-scoped memory/context
+app.post("/api/chat", authRequired, async (req, res) => {
   const { agentId, message, history = [], contextFileIds = [] } = req.body;
 
   if (!agentId || !message) {
@@ -220,13 +246,12 @@ app.post("/api/chat", async (req, res) => {
   }
 
   try {
-    // Build conversation context from history
     const conversation = history
       .map((h) => `${h.role === "user" ? "User" : agent.name}: ${h.content}`)
       .join("\n\n");
 
-    const contextBlock = buildContext(contextFileIds);
-    const memoryBlock = buildMemoryContext(agentId);
+    const contextBlock = buildContext(req.user.id, contextFileIds);
+    const memoryBlock = buildMemoryContext(req.user.id, agentId);
 
     const prompt = `${contextBlock}${memoryBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
 
@@ -234,6 +259,7 @@ app.post("/api/chat", async (req, res) => {
       system: agent.systemPrompt,
       prompt,
       maxTokens: 2000,
+      userId: req.user.id,
     });
 
     res.json({
@@ -249,8 +275,8 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// Run a structured task for an advisor — supports optional data context and memory
-app.post("/api/tasks/run", async (req, res) => {
+// Run a structured task — auth required, user-scoped
+app.post("/api/tasks/run", authRequired, async (req, res) => {
   const { agentId, taskId, inputs = {}, contextFileIds = [] } = req.body;
 
   if (!agentId || !taskId) {
@@ -258,10 +284,15 @@ app.post("/api/tasks/run", async (req, res) => {
   }
 
   try {
-    const contextBlock = buildContext(contextFileIds);
-    const memoryBlock = buildMemoryContext(agentId);
+    const contextBlock = buildContext(req.user.id, contextFileIds);
+    const memoryBlock = buildMemoryContext(req.user.id, agentId);
     const fullContext = contextBlock + memoryBlock;
-    const result = await runTask(agentId, taskId, inputs, { complete }, fullContext);
+
+    // Pass a user-scoped complete function to taskRunner
+    const userLLM = {
+      complete: (opts) => complete({ ...opts, userId: req.user.id }),
+    };
+    const result = await runTask(agentId, taskId, inputs, userLLM, fullContext);
     res.json(result);
   } catch (err) {
     console.error("Task error:", err.message);
@@ -269,10 +300,9 @@ app.post("/api/tasks/run", async (req, res) => {
   }
 });
 
-// --- Inter-Agent Messaging ---
+// --- Inter-Agent Messaging (auth required) ---
 
-// Send a message from one advisor to another
-app.post("/api/agents/message", async (req, res) => {
+app.post("/api/agents/message", authRequired, async (req, res) => {
   const { fromId, toId, type = "request", message, context = "" } = req.body;
 
   if (!fromId || !toId || !message) {
@@ -280,15 +310,17 @@ app.post("/api/agents/message", async (req, res) => {
   }
 
   try {
-    const result = await sendMessage(fromId, toId, type, message, context, { complete });
+    const userLLM = {
+      complete: (opts) => complete({ ...opts, userId: req.user.id }),
+    };
+    const result = await sendMessage(fromId, toId, type, message, context, userLLM);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Run a multi-advisor discussion
-app.post("/api/agents/discuss", async (req, res) => {
+app.post("/api/agents/discuss", authRequired, async (req, res) => {
   const { topic, agentIds } = req.body;
 
   if (!topic || !agentIds || agentIds.length < 2) {
@@ -296,17 +328,19 @@ app.post("/api/agents/discuss", async (req, res) => {
   }
 
   try {
-    const result = await runDiscussion(topic, agentIds, { complete });
+    const userLLM = {
+      complete: (opts) => complete({ ...opts, userId: req.user.id }),
+    };
+    const result = await runDiscussion(topic, agentIds, userLLM);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// --- Report Generation ---
+// --- Report Generation (auth required) ---
 
-// Generate a multi-advisor report
-app.post("/api/reports/generate", async (req, res) => {
+app.post("/api/reports/generate", authRequired, async (req, res) => {
   const { title, subject, sections, synthesizerId } = req.body;
 
   if (!title || !subject || !sections) {
@@ -314,7 +348,10 @@ app.post("/api/reports/generate", async (req, res) => {
   }
 
   try {
-    const report = await generateReport({ title, subject, sections, synthesizerId }, { complete });
+    const userLLM = {
+      complete: (opts) => complete({ ...opts, userId: req.user.id }),
+    };
+    const report = await generateReport({ title, subject, sections, synthesizerId }, userLLM);
     res.json(report);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -323,7 +360,6 @@ app.post("/api/reports/generate", async (req, res) => {
 
 // --- Workflows ---
 
-// List all workflow templates
 app.get("/api/workflows", (req, res) => {
   res.json(
     workflows.map((w) => ({
@@ -342,8 +378,7 @@ app.get("/api/workflows", (req, res) => {
   );
 });
 
-// Execute a workflow
-app.post("/api/workflows/:id/run", async (req, res) => {
+app.post("/api/workflows/:id/run", authRequired, async (req, res) => {
   const { input } = req.body;
 
   if (!input) {
@@ -351,26 +386,23 @@ app.post("/api/workflows/:id/run", async (req, res) => {
   }
 
   try {
-    const result = await executeWorkflow(req.params.id, input, { complete });
+    const userLLM = {
+      complete: (opts) => complete({ ...opts, userId: req.user.id }),
+    };
+    const result = await executeWorkflow(req.params.id, input, userLLM);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// --- Health Check ---
+// --- Health Check (public, no auth) ---
 
 app.get("/api/health", (req, res) => {
-  const dataStats = getDataStats();
-  const memStats = getMemoryStats();
   res.json({
     status: "ok",
-    llmConfigured: isLLMConfigured(),
-    model: getLLMModel(),
     agentCount: agents.length,
     workflowCount: workflows.length,
-    dataFiles: dataStats.fileCount,
-    memoryCount: memStats.total,
   });
 });
 
@@ -383,8 +415,8 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`\n  ╔════════════════════════════════════════════════╗`);
-  console.log(`  ║   C-Suite AI Advisors                          ║`);
+  console.log(`  ║   BetterAI360 — C-Suite Advisors                ║`);
   console.log(`  ║   http://localhost:${PORT}                        ║`);
-  console.log(`  ║   ${agents.length} advisors • ${workflows.length} workflows • ${isLLMConfigured() ? "LLM connected" : "Demo mode"}       ║`);
+  console.log(`  ║   ${agents.length} advisors • ${workflows.length} workflows                    ║`);
   console.log(`  ╚════════════════════════════════════════════════╝\n`);
 });

@@ -1,27 +1,26 @@
 // LLM Client Service
 // Supports OpenAI-compatible chat completion APIs.
-// Falls back to a deterministic demo mode when no API key is configured,
-// so the application is fully functional out of the box for evaluation.
-// Reads config from settings store (data/settings.json) with env var fallback.
+// Falls back to a deterministic demo mode when no API key is configured.
+// Reads config per-user from the settings store.
 
 import "dotenv/config";
 import { getLLMConfig } from "./settingsStore.js";
 
-export function isLLMConfigured() {
-  return Boolean(getLLMConfig().apiKey);
+export function isLLMConfigured(userId) {
+  return Boolean(getLLMConfig(userId).apiKey);
 }
 
-export function getLLMModel() {
-  return getLLMConfig().model;
+export function getLLMModel(userId) {
+  return getLLMConfig(userId).model;
 }
 
 /**
  * Call an OpenAI-compatible chat completion endpoint.
- * @param {{system: string, prompt: string, maxTokens?: number}} opts
+ * @param {{system: string, prompt: string, maxTokens?: number, userId?: number}} opts
  * @returns {Promise<string>} The assistant's response text.
  */
-export async function complete({ system, prompt, maxTokens = 2000 }) {
-  const config = getLLMConfig();
+export async function complete({ system, prompt, maxTokens = 2000, userId }) {
+  const config = getLLMConfig(userId);
   if (config.apiKey) {
     return completeWithAPI({ system, prompt, maxTokens }, config);
   }
@@ -42,11 +41,14 @@ async function completeWithAPI({ system, prompt, maxTokens }, config) {
 
   const MAX_RETRIES = 4;
   let lastError;
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // Abort timeout: 90s per request
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 90000);
+
     try {
-      const res = await fetch(url, {
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -56,155 +58,106 @@ async function completeWithAPI({ system, prompt, maxTokens }, config) {
         signal: controller.signal,
       });
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        const err = new Error(`LLM API error ${res.status}: ${text}`);
-        // Retry on 503 (service unavailable) or 429 (rate limit)
-        if ((res.status === 503 || res.status === 429) && attempt < MAX_RETRIES) {
-          const delay = Math.min(2000 * Math.pow(2, attempt), 30000); // 2s, 4s, 8s, 16s
-          console.error(`LLM ${res.status}, retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms...`);
-          await new Promise(r => setTimeout(r, delay));
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        // Retry on 503, 429, and network errors
+        if (response.status === 503 || response.status === 429) {
+          if (attempt < MAX_RETRIES) {
+            const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s, 16s
+            console.error(
+              `LLM API ${response.status}, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})...`
+            );
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+        }
+        throw new Error(`LLM API error ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error("LLM returned empty response");
+      return content;
+    } catch (err) {
+      clearTimeout(timeout);
+      // Retry on network/abort errors
+      if (err.name === "AbortError" || err.message?.includes("fetch")) {
+        if (attempt < MAX_RETRIES) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.error(
+            `LLM network error, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})...`
+          );
+          await new Promise((r) => setTimeout(r, delay));
           continue;
         }
-        throw err;
       }
-
-      const data = await res.json();
-      return data.choices?.[0]?.message?.content ?? "";
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        err.message = 'LLM API request timed out after 90s';
-      }
-      // Retry on network errors too
-      if (attempt < MAX_RETRIES && err.message?.includes('socket')) {
-        const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
-        console.error(`Network error, retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms...`);
-        await new Promise(r => setTimeout(r, delay));
-        lastError = err;
-        continue;
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeout);
+      lastError = err;
     }
   }
-  throw lastError || new Error('LLM API exhausted retries');
-}
 
+  throw lastError || new Error("LLM API exhausted retries");
+}
 
 /**
  * Demo mode: produces a structured, advisor-aware response when no API key is set.
- * Lets users explore the full UI without an LLM backend.
  */
 function demoResponse({ system, prompt }) {
-  // Extract the advisor identity from the system prompt
-  const nameMatch = system.match(/You are ([^,]+), (Chief[^.]+)\./);
-  const advisorName = nameMatch ? nameMatch[1] : "Advisor";
-  const advisorTitle = nameMatch ? nameMatch[2] : "C-Level Executive";
+  // Extract advisor name and title from system prompt
+  const nameMatch = system?.match(/You are ([^,]+),/);
+  const titleMatch = system?.match(/,\s*([^\.]+)\./);
+  const name = nameMatch ? nameMatch[1] : "Advisor";
+  const title = titleMatch ? titleMatch[1] : "Executive";
 
-  // Detect whether this is a structured task or a chat message
-  const isTask = prompt.includes("TASK:");
-  const userMessage = isTask
-    ? prompt.match(/TASK:\s*(.+?)\n/)?.[1] || "your task"
-    : prompt;
-
-  if (isTask) {
-    const descMatch = prompt.match(/TASK:\s*.+\n(.+)/);
-    const desc = descMatch ? descMatch[1].trim() : "";
-    return formatDemoTask(advisorName, advisorTitle, userMessage, desc, prompt);
+  if (prompt.length > 500) {
+    return formatDemoTask(name, title, "Analysis", "detailed analysis", prompt);
   }
-
-  return formatDemoChat(advisorName, advisorTitle, userMessage);
+  return formatDemoChat(name, title, prompt);
 }
 
 function formatDemoChat(name, title, userMessage) {
-  return `### ${name} — ${title}
+  return `**${name} — ${title}** (Demo Mode)
 
-> **Demo Mode** — No LLM API key configured. This is a simulated response to demonstrate the interface. Add an API key to \`.env\` for real advisor responses.
+I'm currently in demo mode, which means no LLM API key is configured. Here's how I would respond to your message:
 
-You asked: "${truncate(userMessage, 200)}"
+> "${userMessage.slice(0, 200)}"
 
-As ${title}, here's my perspective on this:
+In a live configuration, I would provide strategic analysis drawing on my expertise as ${title}. I'd consider the business implications, risks, and opportunities, and give you actionable recommendations.
 
-## Key Considerations
+**To enable full AI responses:**
+1. Click **Settings** in the sidebar
+2. Enter your OpenAI-compatible API key
+3. Set the model (e.g., gpt-4o, gemini-3.6-flash)
+4. Save
 
-- **Strategic alignment**: Any decision should be evaluated against your company's mission and current strategic priorities. Without that anchor, even good ideas become distractions.
-- **Risk-reward balance**: I'd want to understand the upside scenario and the downside scenario before committing resources.
-- **Timing and sequencing**: The right move at the wrong time is still the wrong move.
-
-## Initial Assessment
-
-This is a topic that sits squarely in my domain as ${title}. To give you a genuinely useful answer rather than a generic one, I'd need more context about your specific situation — your company stage, resources, constraints, and what success looks like.
-
-## Recommended Next Steps
-
-1. **Clarify the objective** — What specific outcome are you trying to achieve?
-2. **Gather context** — What data or input would make this decision better informed?
-3. **Define success** — How will you know the decision was right in 3, 6, 12 months?
-
-I'm ready to go deeper. Give me specifics and I'll give you specifics back.
-
-*— ${name}*`;
+*Demo mode lets you explore the full UI without an LLM backend.*`;
 }
 
 function formatDemoTask(name, title, taskName, description, fullPrompt) {
-  const inputSection = fullPrompt.match(/INPUTS:\n([\s\S]+?)\n\nINSTRUCTIONS:/);
-  const inputs = inputSection ? inputSection[1].trim() : "(none provided)";
+  const inputPreview = fullPrompt.slice(0, 300);
+  return `## ${taskName} — Demo Mode
 
-  return `# ${taskName}
+**${name}**, ${title}
 
-**Prepared by:** ${name}, ${title}
-**Date:** ${new Date().toISOString().split("T")[0]}
+This task was executed in demo mode (no API key configured). Here's a summary of what the full analysis would cover:
 
-> **Demo Mode** — No LLM API key configured. This is a simulated deliverable to demonstrate the task interface. Add an API key to \`.env\` for real advisor analysis.
+### Input Summary
+\`\`\`
+${inputPreview}...
+\`\`\`
 
----
+### What I Would Analyze
+As ${title}, I would approach this ${description} by:
+1. **Assessing the current situation** — understanding the context and constraints
+2. **Identifying key factors** — the variables that matter most
+3. **Evaluating options** — tradeoffs between different approaches
+4. **Recommending a path forward** — with specific, actionable steps
+5. **Flagging risks** — what could go wrong and how to mitigate
 
-## 1. Executive Summary
-
-This ${taskName.toLowerCase()} addresses the inputs provided and applies ${title}'s domain expertise to produce actionable recommendations. The analysis below is structured to support decision-making.
-
-**Inputs received:**
-${inputs}
-
-## 2. Analysis / Assessment
-
-Based on the information provided, here are the key observations from a ${title} perspective:
-
-| Dimension | Observation | Significance |
-|-----------|-------------|--------------|
-| Current state | Determined from inputs | Establishes baseline |
-| Key drivers | Primary factors at play | Where to focus attention |
-| Constraints | Limiting factors | What boundaries to work within |
-| Opportunities | Upside scenarios | Where value can be created |
-
-## 3. Recommendations / Deliverable
-
-1. **Immediate actions (0-30 days):** Begin with the highest-impact, lowest-effort moves that build momentum.
-2. **Short-term initiatives (30-90 days):** Establish the foundation and measurement framework.
-3. **Strategic initiatives (90+ days):** Pursue the opportunities that compound over time.
-
-## 4. Key Risks & Mitigations
-
-- **Risk:** Execution capacity may be insufficient → **Mitigation:** Phase initiatives and validate before scaling.
-- **Risk:** Assumptions may not hold → **Mitigation:** Define leading indicators and review monthly.
-- **Risk:** External factors may shift → **Mitigation:** Build flexibility into the plan.
-
-## 5. Next Steps
-
-1. Review this analysis with stakeholders
-2. Validate assumptions against available data
-3. Assign owners and deadlines to each recommendation
-4. Schedule a review checkpoint in 30 days
-
----
-
-*This deliverable was prepared in demo mode. Configure an LLM API key for expert-level analysis.*
-
-*— ${name}, ${title}*`;
+**To enable full AI responses, configure your API key in Settings.**`;
 }
 
 function truncate(str, n) {
-  if (str.length <= n) return str;
-  return str.slice(0, n) + "...";
+  return str.length > n ? str.slice(0, n) + "..." : str;
 }

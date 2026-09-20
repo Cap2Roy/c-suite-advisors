@@ -1635,9 +1635,239 @@
     }
     .persona-file-item .pf-actions button:hover { color: var(--text); }
     .persona-file-item .pf-actions button.danger:hover { color: var(--danger); border-color: var(--danger); }
+
+    /* --- Auth Screen --- */
+    .auth-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+    }
+    .auth-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: var(--shadow);
+    }
+    .auth-logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .auth-logo .logo-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    .auth-logo h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .auth-logo p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .auth-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 4px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: var(--transition);
+      border: none;
+      background: none;
+    }
+    .auth-tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .auth-field {
+      margin-bottom: 16px;
+    }
+    .auth-field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .auth-field input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: var(--transition);
+    }
+    .auth-field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    .auth-btn {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .auth-btn:hover { background: var(--accent-hover); }
+    .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .auth-error {
+      color: var(--danger);
+      font-size: 13px;
+      text-align: center;
+      margin-top: 12px;
+      min-height: 18px;
+    }
+    .auth-tos {
+      margin: 16px 0;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .auth-tos input { margin-top: 2px; }
+    .auth-tos a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .auth-tos a:hover { text-decoration: underline; }
+
+    /* --- User Menu --- */
+    .user-menu {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .user-info { flex: 1; min-width: 0; }
+    .user-info .name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .user-info .email {
+      font-size: 11px;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .user-logout {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .user-logout:hover { color: var(--danger); border-color: var(--danger); }
+
+    /* --- Legal Document Modal --- */
+    .legal-doc {
+      max-width: 700px;
+      line-height: 1.7;
+    }
+    .legal-doc h2 { font-size: 18px; margin: 20px 0 8px; }
+    .legal-doc h3 { font-size: 15px; margin: 16px 0 6px; color: var(--accent-hover); }
+    .legal-doc p { margin-bottom: 10px; color: var(--text-muted); }
+    .legal-doc ul { margin: 8px 0 12px 20px; color: var(--text-muted); }
+    .legal-doc li { margin-bottom: 4px; }
   </style>
 </head>
 <body>
+  <!-- Auth Screen -->
+  <div class="auth-screen" id="authScreen">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="logo-icon">🏢</div>
+        <h1>BetterAI360</h1>
+        <p>Your AI Executive Team</p>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="loginTab" onclick="switchAuthTab('login')">Sign In</button>
+        <button class="auth-tab" id="registerTab" onclick="switchAuthTab('register')">Sign Up</button>
+      </div>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="auth-field">
+          <label>Email</label>
+          <input type="email" id="loginEmail" placeholder="you@company.com" required>
+        </div>
+        <div class="auth-field">
+          <label>Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="auth-btn" id="loginBtn">Sign In</button>
+        <div class="auth-error" id="loginError"></div>
+      </form>
+      <form id="registerForm" onsubmit="handleRegister(event)" style="display:none">
+        <div class="auth-field">
+          <label>Name</label>
+          <input type="text" id="registerName" placeholder="Your name">
+        </div>
+        <div class="auth-field">
+          <label>Email</label>
+          <input type="email" id="registerEmail" placeholder="you@company.com" required>
+        </div>
+        <div class="auth-field">
+          <label>Password</label>
+          <input type="password" id="registerPassword" placeholder="Min 6 characters" required>
+        </div>
+        <div class="auth-tos">
+          <input type="checkbox" id="tosCheck" required>
+          <span>I agree to the <a href="#" onclick="showLegalDoc('tos'); return false;">Terms of Service</a> and <a href="#" onclick="showLegalDoc('privacy'); return false;">Privacy Policy</a></span>
+        </div>
+        <button type="submit" class="auth-btn" id="registerBtn">Create Account</button>
+        <div class="auth-error" id="registerError"></div>
+      </form>
+    </div>
+  </div>
+
   <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
 
   <div class="app">
@@ -1647,8 +1877,8 @@
         <div class="logo">
           <div class="logo-icon">🏢</div>
           <div class="logo-text">
-            <h1>C-Suite Advisors</h1>
-            <p>Your AI Executive Team</p>
+            <h1>BetterAI360</h1>
+            <p>C-Suite AI Advisors</p>
           </div>
         </div>
         <div class="mode-badge" id="modeBadge">
@@ -1685,6 +1915,14 @@
       <div class="nav-section advisor-list">
         <div class="nav-label">Advisors</div>
         <div id="advisorList"></div>
+      </div>
+      <div class="user-menu" id="userMenu">
+        <div class="user-avatar" id="userAvatar">U</div>
+        <div class="user-info">
+          <div class="name" id="userName">User</div>
+          <div class="email" id="userEmail">user@example.com</div>
+        </div>
+        <button class="user-logout" onclick="handleLogout()">Logout</button>
       </div>
     </aside>
 
@@ -1730,88 +1968,308 @@
     let personalMemory = {};
     let currentDetailAdvisor = null;
     let currentDetailTab = 'chat';
+    let authToken = null;
+    let currentUser = null;
 
+    // --- Auth helpers ---
+    function authHeaders() {
+      const h = {};
+      if (authToken) h['Authorization'] = `Bearer ${authToken}`;
+      return h;
+    }
+
+    // Wrapper that injects auth token and handles 401 globally
+    async function apiFetch(url, opts = {}) {
+      opts.headers = { ...authHeaders(), ...(opts.headers || {}) };
+      const res = await fetch(url, opts);
+      if (res.status === 401) {
+        // Session expired — clear and show login
+        handleLogout();
+        throw new Error('Session expired');
+      }
+      return res;
+    }
+
+    function apiJson(url, opts = {}) {
+      return apiFetch(url, opts).then(r => r.json());
+    }
     const API = {
-      getAgents: () => fetch('/api/agents').then(r => r.json()),
-      getTasks: () => fetch('/api/tasks').then(r => r.json()),
-      getWorkflows: () => fetch('/api/workflows').then(r => r.json()),
-      getKnowledge: () => fetch('/api/data').then(r => r.json()),
-      getKnowledgeByAgent: (agentId) => fetch(`/api/data?agentId=${agentId}`).then(r => r.json()),
+      getAgents: () => apiJson('/api/agents'),
+      getTasks: () => apiJson('/api/tasks'),
+      getWorkflows: () => apiJson('/api/workflows'),
+      getKnowledge: () => apiJson('/api/data'),
+      getKnowledgeByAgent: (agentId) => apiJson(`/api/data?agentId=${agentId}`),
       chat: (agentId, message, history, contextFileIds) =>
-        fetch('/api/chat', {
+        apiJson('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ agentId, message, history, contextFileIds }),
-        }).then(r => r.json()),
+        }),
       runTask: (agentId, taskId, inputs, contextFileIds) =>
-        fetch('/api/tasks/run', {
+        apiJson('/api/tasks/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ agentId, taskId, inputs, contextFileIds }),
-        }).then(r => r.json()),
+        }),
       uploadFile: (name, content, agentId) =>
-        fetch('/api/data', {
+        apiJson('/api/data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, content, agentId }),
-        }).then(r => r.json()),
+        }),
       uploadFileForm: (formData) =>
-        fetch('/api/data', { method: 'POST', body: formData }).then(r => r.json()),
+        apiFetch('/api/data', { method: 'POST', body: formData }).then(r => r.json()),
       deleteFile: (id) =>
-        fetch(`/api/data/${id}`, { method: 'DELETE' }).then(r => r.json()),
+        apiJson(`/api/data/${id}`, { method: 'DELETE' }),
       runWorkflow: (id, input) =>
-        fetch(`/api/workflows/${id}/run`, {
+        apiJson(`/api/workflows/${id}/run`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ input }),
-        }).then(r => r.json()),
+        }),
       generateReport: (title, subject, sections, synthesizerId) =>
-        fetch('/api/reports/generate', {
+        apiJson('/api/reports/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, subject, sections, synthesizerId }),
-        }).then(r => r.json()),
+        }),
       discuss: (topic, agentIds) =>
-        fetch('/api/agents/discuss', {
+        apiJson('/api/agents/discuss', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ topic, agentIds }),
-        }).then(r => r.json()),
+        }),
       message: (fromId, toId, type, message, context) =>
-        fetch('/api/agents/message', {
+        apiJson('/api/agents/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fromId, toId, type, message, context }),
-        }).then(r => r.json()),
+        }),
       // Settings
-      getSettings: () => fetch('/api/settings').then(r => r.json()),
+      getSettings: () => apiJson('/api/settings'),
       updateSettings: (apiKey, apiBase, model) =>
-        fetch('/api/settings', {
+        apiJson('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ apiKey, apiBase, model }),
-        }).then(r => r.json()),
+        }),
       // Memory
-      getSharedMemory: () => fetch('/api/memory/shared').then(r => r.json()),
+      getSharedMemory: () => apiJson('/api/memory/shared'),
       addSharedMemory: (content) =>
-        fetch('/api/memory/shared', {
+        apiJson('/api/memory/shared', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content, createdBy: 'user' }),
-        }).then(r => r.json()),
+        }),
       deleteSharedMemory: (id) =>
-        fetch(`/api/memory/shared/${id}`, { method: 'DELETE' }).then(r => r.json()),
-      getPersonalMemory: (agentId) => fetch(`/api/memory/personal/${agentId}`).then(r => r.json()),
+        apiJson(`/api/memory/shared/${id}`, { method: 'DELETE' }),
+      getPersonalMemory: (agentId) => apiJson(`/api/memory/personal/${agentId}`),
       addPersonalMemory: (agentId, content) =>
-        fetch(`/api/memory/personal/${agentId}`, {
+        apiJson(`/api/memory/personal/${agentId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content }),
-        }).then(r => r.json()),
+        }),
       deletePersonalMemory: (agentId, id) =>
-        fetch(`/api/memory/personal/${agentId}/${id}`, { method: 'DELETE' }).then(r => r.json()),
-      getMemoryStats: () => fetch('/api/memory/stats').then(r => r.json()),
+        apiJson(`/api/memory/personal/${agentId}/${id}`, { method: 'DELETE' }),
+      getMemoryStats: () => apiJson('/api/memory/stats'),
     };
+
+    // --- Auth ---
+    async function checkAuth() {
+      const token = localStorage.getItem('csuite_token');
+      if (!token) return false;
+      try {
+        const res = await fetch('/api/auth/session', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          localStorage.removeItem('csuite_token');
+          return false;
+        }
+        const data = await res.json();
+        authToken = token;
+        currentUser = data.user;
+        updateUserMenu();
+        return true;
+      } catch {
+        localStorage.removeItem('csuite_token');
+        return false;
+      }
+    }
+
+    function showAuthScreen() {
+      document.getElementById('authScreen').style.display = 'flex';
+      document.querySelector('.app').style.display = 'none';
+    }
+
+    function hideAuthScreen() {
+      document.getElementById('authScreen').style.display = 'none';
+      document.querySelector('.app').style.display = 'flex';
+    }
+
+    function switchAuthTab(tab) {
+      document.getElementById('loginTab').classList.toggle('active', tab === 'login');
+      document.getElementById('registerTab').classList.toggle('active', tab === 'register');
+      document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+      document.getElementById('loginError').textContent = '';
+      document.getElementById('registerError').textContent = '';
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      const errEl = document.getElementById('loginError');
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+      errEl.textContent = '';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: loginEmail.value,
+            password: loginPassword.value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+        authToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem('csuite_token', data.token);
+        updateUserMenu();
+        hideAuthScreen();
+        await init();
+      } catch (err) {
+        errEl.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
+    }
+
+    async function handleRegister(event) {
+      event.preventDefault();
+      const btn = document.getElementById('registerBtn');
+      const errEl = document.getElementById('registerError');
+      btn.disabled = true;
+      btn.textContent = 'Creating account...';
+      errEl.textContent = '';
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: registerEmail.value,
+            password: registerPassword.value,
+            name: registerName.value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Registration failed');
+        authToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem('csuite_token', data.token);
+        updateUserMenu();
+        hideAuthScreen();
+        await init();
+      } catch (err) {
+        errEl.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+      }
+    }
+
+    function handleLogout() {
+      authToken = null;
+      currentUser = null;
+      localStorage.removeItem('csuite_token');
+      showAuthScreen();
+    }
+
+    function updateUserMenu() {
+      if (!currentUser) return;
+      document.getElementById('userAvatar').textContent = currentUser.name.charAt(0).toUpperCase();
+      document.getElementById('userName').textContent = currentUser.name;
+      document.getElementById('userEmail').textContent = currentUser.email;
+    }
+
+    // --- Legal Document Viewer ---
+    function showLegalDoc(type) {
+      const content = type === 'tos' ? TOS_HTML : PRIVACY_HTML;
+      const title = type === 'tos' ? 'Terms of Service' : 'Privacy Policy';
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.style.display = 'flex';
+      modal.innerHTML = `
+        <div class="modal" style="max-width: 700px;">
+          <div class="modal-header">
+            <h2>${title}</h2>
+          </div>
+          <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+            <div class="legal-doc">${content}</div>
+          </div>
+          <div class="modal-footer">
+            <button class="modal-btn primary" onclick="this.closest('.modal-overlay').remove()">Close</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    const TOS_HTML = `<h2>Terms of Service</h2>
+<p><strong>Effective Date:</strong> September 20, 2026</p>
+<h3>1. Acceptance of Terms</h3>
+<p>By accessing or using BetterAI360 ("the Service"), operated by BetterAI360.com ("we," "us," or "our"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you must not access or use the Service.</p>
+<h3>2. Description of Service</h3>
+<p>BetterAI360 provides an AI-powered C-suite advisory platform that allows users to interact with AI advisors, assign tasks, and generate business analysis. The Service is provided for informational and business planning purposes.</p>
+<h3>3. User Accounts</h3>
+<p>You must register an account to use the Service. You agree to provide accurate information and are responsible for maintaining the security of your account and password. You are responsible for all activity under your account.</p>
+<h3>4. Acceptable Use</h3>
+<p>You agree not to: (a) use the Service for unlawful purposes; (b) attempt to gain unauthorized access to any part of the Service; (c) interfere with the proper functioning of the Service; (d) use the Service to generate content that is illegal, harmful, or infringes on others' rights.</p>
+<h3>5. AI-Generated Content</h3>
+<p>Content generated by the AI advisors is provided for informational purposes only and does not constitute professional advice. You should not rely on AI-generated content as the sole basis for business decisions. We are not liable for decisions made based on AI-generated content.</p>
+<h3>6. Intellectual Property</h3>
+<p>You retain ownership of content you upload to the Service. We retain all rights to the Service, including software, design, and AI models. You grant us a license to process your content through the AI models to provide the Service.</p>
+<h3>7. Data and Privacy</h3>
+<p>Your use of the Service is also governed by our Privacy Policy. We collect and process data as described in that policy. AI model providers may process your prompts and content according to their own policies.</p>
+<h3>8. Limitation of Liability</h3>
+<p>The Service is provided "as is" without warranties of any kind. To the maximum extent permitted by law, we are not liable for any indirect, incidental, special, or consequential damages arising from your use of the Service.</p>
+<h3>9. Termination</h3>
+<p>We may suspend or terminate your account at any time for violation of these Terms. You may delete your account at any time by ceasing to use the Service.</p>
+<h3>10. Modifications</h3>
+<p>We may modify these Terms at any time. Material changes will be communicated via the Service or email. Continued use after changes constitutes acceptance of the updated Terms.</p>
+<h3>11. Governing Law</h3>
+<p>These Terms are governed by the laws of the United States. Disputes will be resolved in the courts of competent jurisdiction.</p>
+<h3>12. Contact</h3>
+<p>For questions about these Terms, contact us at legal@betterai360.com.</p>`;
+
+    const PRIVACY_HTML = `<h2>Privacy Policy</h2>
+<p><strong>Effective Date:</strong> September 20, 2026</p>
+<h3>1. Information We Collect</h3>
+<p><strong>Account information:</strong> Name, email address, and password (hashed). <strong>Content:</strong> Text you enter as prompts, tasks, or knowledge files. <strong>Usage data:</strong> Features used, timestamps, and interaction patterns.</p>
+<h3>2. How We Use Your Information</h3>
+<p>We use your information to: (a) provide and maintain the Service; (b) authenticate your account; (c) process your requests through AI models; (d) improve the Service; (e) communicate with you about your account.</p>
+<h3>3. AI Processing</h3>
+<p>Your prompts and content are sent to third-party AI model providers (e.g., Google Gemini) for processing. These providers process your data according to their own privacy policies. We do not control how third-party providers handle your data once transmitted.</p>
+<h3>4. Data Storage</h3>
+<p>Your data is stored on our servers and cloud infrastructure providers. Data is isolated per-user account. We use industry-standard security measures to protect your data.</p>
+<h3>5. Data Sharing</h3>
+<p>We do not sell your data. We share data with: (a) AI model providers for processing your requests; (b) cloud infrastructure providers for hosting; (c) legal authorities when required by law.</p>
+<h3>6. Your Rights</h3>
+<p>Under GDPR/CCPA, you have the right to: (a) access your data; (b) delete your data and account; (c) export your data; (d) object to processing; (e) withdraw consent. To exercise these rights, contact privacy@betterai360.com.</p>
+<h3>7. Cookies</h3>
+<p>We use essential cookies for session management. We do not use tracking or advertising cookies.</p>
+<h3>8. Data Retention</h3>
+<p>We retain your data for as long as your account is active. You may delete your account and all associated data at any time.</p>
+<h3>9. Children's Privacy</h3>
+<p>The Service is not directed to children under 13. We do not knowingly collect data from children. If you believe we have collected data from a child, contact us to delete it.</p>
+<h3>10. Changes to This Policy</h3>
+<p>We may update this Privacy Policy at any time. Material changes will be communicated via the Service or email. Continued use after changes constitutes acceptance.</p>
+<h3>11. Contact</h3>
+<p>For privacy questions, contact privacy@betterai360.com.</p>`;
 
     // --- Init ---
     async function init() {
@@ -1838,17 +2296,24 @@
         const res = await fetch('/api/health').then(r => r.json());
         const badge = document.getElementById('modeBadge');
         const text = document.getElementById('modeText');
-        if (res.llmConfigured) {
-          badge.classList.add('live');
-          text.textContent = res.model || 'LLM Connected';
-        } else {
-          badge.classList.remove('live');
-          text.textContent = 'Demo Mode';
-        }
+        // Health endpoint no longer returns LLM config (per-user now); show advisor count
+        text.textContent = `${res.agentCount} Advisors`;
+        badge.classList.add('live');
       } catch {
         document.getElementById('modeText').textContent = 'Demo Mode';
       }
     }
+
+    // --- Bootstrap: check auth before init ---
+    (async function bootstrap() {
+      const authed = await checkAuth();
+      if (authed) {
+        hideAuthScreen();
+        await init();
+      } else {
+        showAuthScreen();
+      }
+    })();
 
     // --- Markdown Renderer ---
     function renderMarkdown(text) {
@@ -2385,7 +2850,7 @@
 
     async function viewFile(id) {
       try {
-        const res = await fetch(`/api/data/${id}`).then(r => r.json());
+        const res = await apiFetch(`/api/data/${id}`).then(r => r.json());
         showTaskResult(res.name, res.content);
       } catch (err) {
         alert('Failed to load: ' + err.message);
@@ -2989,14 +3454,21 @@
             <span id="settingsSavedMsg" style="margin-left:12px;font-size:13px;color:var(--success)"></span>
           </div>
           <div class="settings-panel">
+            <h3>📄 Legal Documents</h3>
+            <p class="text-muted" style="font-size:13px;line-height:1.6;margin-bottom:12px">
+              View the Terms of Service and Privacy Policy for BetterAI360.
+            </p>
+            <button class="settings-save-btn" style="display:inline-block;width:auto;padding:8px 16px;margin-right:8px" onclick="showLegalDoc('tos')">Terms of Service</button>
+            <button class="settings-save-btn" style="display:inline-block;width:auto;padding:8px 16px" onclick="showLegalDoc('privacy')">Privacy Policy</button>
+          </div>
+          <div class="settings-panel">
             <h3>ℹ️ About</h3>
             <p class="text-muted" style="font-size:13px;line-height:1.6">
-              C-Suite AI Advisors lets you interact with AI personas representing key C-level executives.
+              BetterAI360 — C-Suite AI Advisors lets you interact with AI personas representing key C-level executives.
               Configure your LLM API key here to enable live responses, or use demo mode to explore the UI.
               Memory and knowledge files are injected into advisor prompts automatically.
             </p>
           </div>
-        </div>
       `;
       document.getElementById('mainContent').innerHTML = content;
     }
@@ -3013,7 +3485,7 @@
         // Send undefined if apiKey input is blank (keep current key)
         const payload = { apiBase, model };
         if (apiKey.trim()) payload.apiKey = apiKey.trim();
-        await fetch('/api/settings', {
+        await apiFetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -3038,15 +3510,13 @@
 
     async function viewFile(id) {
       try {
-        const file = await fetch(`/api/data/${id}`).then(r => r.json());
+        const file = await apiFetch(`/api/data/${id}`).then(r => r.json());
         showTaskResult(file.name, file.content);
       } catch (err) {
         alert('Failed to load file: ' + err.message);
       }
     }
 
-    // --- Start ---
-    init();
   </script>
 </body>
 </html>

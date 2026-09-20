@@ -1,9 +1,6 @@
-// Memory Service
-// Manages shared memory (accessible by all advisors) and per-advisor
-// personal memory. Each memory entry is a note that gets injected into
-// the advisor's system prompt to provide persistent context.
+// Memory Service — User-isolated shared + per-advisor memory.
+// Each user has their own memory store: data/user-{id}/memory.json
 //
-// Storage: data/memory.json
 // Structure:
 // {
 //   shared: [{ id, content, createdAt, createdBy }],
@@ -15,137 +12,147 @@ import fs from "fs";
 import path from "path";
 
 const DATA_DIR = path.resolve("data");
-const MEMORY_FILE = path.join(DATA_DIR, "memory.json");
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-if (!fs.existsSync(MEMORY_FILE)) {
-  fs.writeFileSync(
-    MEMORY_FILE,
-    JSON.stringify({ shared: [], personal: {}, nextId: 1 }, null, 2)
-  );
+function getUserDir(userId) {
+  if (!userId) return DATA_DIR;
+  const dir = path.join(DATA_DIR, `user-${userId}`);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
 }
 
-function readMemory() {
+function getMemoryFile(userId) {
+  return path.join(getUserDir(userId), "memory.json");
+}
+
+function ensureMemory(userId) {
+  const memFile = getMemoryFile(userId);
+  if (!fs.existsSync(memFile)) {
+    fs.writeFileSync(
+      memFile,
+      JSON.stringify({ shared: [], personal: {}, nextId: 1 }, null, 2)
+    );
+  }
+}
+
+function readMemory(userId) {
+  ensureMemory(userId);
   try {
-    return JSON.parse(fs.readFileSync(MEMORY_FILE, "utf-8"));
+    return JSON.parse(fs.readFileSync(getMemoryFile(userId), "utf-8"));
   } catch {
     return { shared: [], personal: {}, nextId: 1 };
   }
 }
 
-function writeMemory(memory) {
-  fs.writeFileSync(MEMORY_FILE, JSON.stringify(memory, null, 2));
+function writeMemory(userId, memory) {
+  fs.writeFileSync(getMemoryFile(userId), JSON.stringify(memory, null, 2));
 }
 
 // --- Shared Memory ---
 
-export function getSharedMemory() {
-  return readMemory().shared;
+export function getSharedMemory(userId) {
+  return readMemory(userId).shared;
 }
 
-export function addSharedMemory(content, createdBy = "user") {
-  const mem = readMemory();
+export function addSharedMemory(userId, content, createdBy = "user") {
+  const memory = readMemory(userId);
   const entry = {
-    id: mem.nextId++,
+    id: memory.nextId++,
     content,
     createdAt: new Date().toISOString(),
     createdBy,
   };
-  mem.shared.push(entry);
-  writeMemory(mem);
+  memory.shared.push(entry);
+  writeMemory(userId, memory);
   return entry;
 }
 
-export function deleteSharedMemory(id) {
-  const mem = readMemory();
-  const before = mem.shared.length;
-  mem.shared = mem.shared.filter((m) => m.id !== Number(id));
-  writeMemory(mem);
-  return mem.shared.length < before;
+export function deleteSharedMemory(userId, id) {
+  const memory = readMemory(userId);
+  const before = memory.shared.length;
+  memory.shared = memory.shared.filter((m) => m.id !== parseInt(id));
+  const deleted = before !== memory.shared.length;
+  writeMemory(userId, memory);
+  return deleted;
 }
 
 // --- Personal Memory (per advisor) ---
 
-export function getPersonalMemory(agentId) {
-  const mem = readMemory();
-  return mem.personal[agentId] || [];
+export function getPersonalMemory(userId, agentId) {
+  const memory = readMemory(userId);
+  return memory.personal[agentId] || [];
 }
 
-export function addPersonalMemory(agentId, content) {
-  const mem = readMemory();
-  if (!mem.personal[agentId]) mem.personal[agentId] = [];
+export function addPersonalMemory(userId, agentId, content) {
+  const memory = readMemory(userId);
+  if (!memory.personal[agentId]) memory.personal[agentId] = [];
   const entry = {
-    id: mem.nextId++,
+    id: memory.nextId++,
     content,
     createdAt: new Date().toISOString(),
   };
-  mem.personal[agentId].push(entry);
-  writeMemory(mem);
+  memory.personal[agentId].push(entry);
+  writeMemory(userId, memory);
   return entry;
 }
 
-export function deletePersonalMemory(agentId, id) {
-  const mem = readMemory();
-  if (!mem.personal[agentId]) return false;
-  const before = mem.personal[agentId].length;
-  mem.personal[agentId] = mem.personal[agentId].filter(
-    (m) => m.id !== Number(id)
+export function deletePersonalMemory(userId, agentId, id) {
+  const memory = readMemory(userId);
+  if (!memory.personal[agentId]) return false;
+  const before = memory.personal[agentId].length;
+  memory.personal[agentId] = memory.personal[agentId].filter(
+    (m) => m.id !== parseInt(id)
   );
-  writeMemory(mem);
-  return mem.personal[agentId].length < before;
+  const deleted = before !== memory.personal[agentId].length;
+  writeMemory(userId, memory);
+  return deleted;
 }
 
 // --- Memory Context for Prompts ---
 
-/**
- * Build a memory context block to inject into prompts.
- * Includes both shared memory and the advisor's personal memory.
- * @param {string} agentId - The advisor ID
- * @returns {string} Formatted memory block, or empty string if none.
- */
-export function buildMemoryContext(agentId) {
-  const mem = readMemory();
-  const shared = mem.shared;
-  const personal = mem.personal[agentId] || [];
-
-  if (shared.length === 0 && personal.length === 0) return "";
-
-  let block = "\n\nPERSISTENT MEMORY:\n";
+export function buildMemoryContext(userId, agentId) {
+  const memory = readMemory(userId);
+  const shared = memory.shared;
+  const personal = memory.personal[agentId] || [];
+  let context = "";
 
   if (shared.length > 0) {
-    block += "\nShared organizational memory (applies to all advisors):\n";
+    context += "## Shared Company Context\n";
+    context += "These are notes shared across all advisors. Weave them naturally into your analysis:\n\n";
     shared.forEach((m) => {
-      block += `- ${m.content}\n`;
+      context += `- ${m.content}\n`;
     });
+    context += "\n";
   }
 
   if (personal.length > 0) {
-    block += `\nYour personal memory (specific to you as ${agentId}):\n`;
+    context += "## Personal Memory\n";
+    context += "These are notes specific to your role. Use them as persistent context:\n\n";
     personal.forEach((m) => {
-      block += `- ${m.content}\n`;
+      context += `- ${m.content}\n`;
     });
+    context += "\n";
   }
 
-  block += "\nUse this memory as background context. Do not repeat it verbatim — weave it into your analysis naturally.\n";
-
-  return block;
+  return context;
 }
 
 /**
  * Get all memory stats.
  */
-export function getMemoryStats() {
-  const mem = readMemory();
-  const personalCount = Object.values(mem.personal).reduce(
+export function getMemoryStats(userId) {
+  const memory = readMemory(userId);
+  const personalCount = Object.values(memory.personal).reduce(
     (sum, entries) => sum + entries.length,
     0
   );
   return {
-    sharedCount: mem.shared.length,
+    sharedCount: memory.shared.length,
     personalCount,
-    total: mem.shared.length + personalCount,
-    advisorsWithMemory: Object.keys(mem.personal).length,
+    total: memory.shared.length + personalCount,
+    advisorsWithMemory: Object.keys(memory.personal).filter(
+      (k) => memory.personal[k].length > 0
+    ).length,
   };
 }

@@ -1,38 +1,45 @@
-// Settings Service
-// Persists LLM configuration (API key, base URL, model) to data/settings.json.
-// Allows runtime updates via the UI without restarting the server.
+// Settings Service — User-isolated LLM configuration.
+// Each user has their own settings: data/user-{id}/settings.json
 
 import fs from "fs";
 import path from "path";
 import "dotenv/config";
 
 const DATA_DIR = path.resolve("data");
-const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+function getUserDir(userId) {
+  if (!userId) return DATA_DIR;
+  const dir = path.join(DATA_DIR, `user-${userId}`);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
 }
 
-function readSettings() {
+function getSettingsFile(userId) {
+  return path.join(getUserDir(userId), "settings.json");
+}
+
+function readSettings(userId) {
   try {
-    return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
+    return JSON.parse(fs.readFileSync(getSettingsFile(userId), "utf-8"));
   } catch {
     return {};
   }
 }
 
-function writeSettings(settings) {
-  const current = readSettings();
+function writeSettings(userId, settings) {
+  const current = readSettings(userId);
   const merged = { ...current, ...settings };
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2));
+  fs.writeFileSync(getSettingsFile(userId), JSON.stringify(merged, null, 2));
   return merged;
 }
 
 /**
  * Get current LLM settings (API key is masked).
  */
-export function getSettings() {
-  const stored = readSettings();
+export function getSettings(userId) {
+  const stored = readSettings(userId);
   const apiKey =
     stored.apiKey ||
     process.env.OPENAI_API_KEY ||
@@ -50,7 +57,6 @@ export function getSettings() {
     apiBase,
     model,
     hasKey: Boolean(apiKey),
-    // Mask key for display: show first 4 + last 4 chars
     maskedKey: apiKey ? `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}` : "",
   };
 }
@@ -58,22 +64,36 @@ export function getSettings() {
 /**
  * Update LLM settings. Only provided fields are updated.
  */
-export function updateSettings({ apiKey, apiBase, model }) {
+export function updateSettings(userId, { apiKey, apiBase, model }) {
   const updates = {};
-  if (apiKey !== undefined) updates.apiKey = apiKey;
-  if (apiBase !== undefined) updates.apiBase = apiBase;
-  if (model !== undefined) updates.model = model;
-  return writeSettings(updates);
+  if (apiKey !== undefined && apiKey !== "") updates.apiKey = apiKey;
+  if (apiBase !== undefined && apiBase !== "") updates.apiBase = apiBase;
+  if (model !== undefined && model !== "") updates.model = model;
+  return writeSettings(userId, updates);
 }
 
 /**
  * Get the raw values needed by llmClient (unmasked).
  */
-export function getLLMConfig() {
-  const s = getSettings();
+export function getLLMConfig(userId) {
+  const s = getSettings(userId);
   return {
     apiKey: s.apiKey,
     apiBase: s.apiBase,
     model: s.model,
   };
+}
+
+/**
+ * Get the current model name for health endpoint.
+ */
+export function getLLMModel(userId) {
+  return getSettings(userId).model || "gpt-4o";
+}
+
+/**
+ * Check if LLM is configured.
+ */
+export function isLLMConfigured(userId) {
+  return Boolean(getSettings(userId).apiKey);
 }
