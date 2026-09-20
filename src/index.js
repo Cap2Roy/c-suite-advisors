@@ -10,6 +10,16 @@ process.on('unhandledRejection', (reason, promise) => {
 import express from "express";
 import multer from "multer";
 import { agents, getAgentById } from "./agents/definitions.js";
+import {
+  getAdvisorConfig,
+  saveAdvisorConfig,
+  resetAdvisorConfig,
+  getCustomAdvisors,
+  createCustomAdvisor,
+  updateCustomAdvisor,
+  deleteCustomAdvisor,
+} from "./services/advisorConfigStore.js";
+import { getEffectiveAgents, getEffectiveAgent } from "./services/agentResolver.js";
 import { runTask, getAllTasks } from "./services/taskRunner.js";
 import { complete, isLLMConfigured, getLLMModel } from "./services/llmClient.js";
 import {
@@ -24,6 +34,7 @@ import {
 import { sendMessage, runDiscussion, MessageType } from "./services/orchestrator.js";
 import { generateReport, formatReportAsMarkdown } from "./services/reportGenerator.js";
 import { workflows, executeWorkflow } from "./services/workflows.js";
+import { runSimulation } from "./services/simulationRunner.js";
 import {
   getSettings,
   updateSettings,
@@ -45,7 +56,7 @@ import {
   getUserById,
   verifyAuthToken,
 } from "./services/userStore.js";
-import { authRequired } from "./services/authMiddleware.js";
+import { authRequired, authOptional } from "./services/authMiddleware.js";
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
@@ -226,8 +237,13 @@ app.delete("/api/data/:id", authRequired, async (req, res) => {
 
 // --- Agent Routes (public metadata, auth for chat/task) ---
 
-app.get("/api/agents", (req, res) => {
-  const summary = agents.map((a) => ({
+// GET /api/agents — returns effective agents (base + overrides + custom) for the user.
+// Uses authOptional: if authenticated, includes per-user overrides and custom advisors.
+app.get("/api/agents", authOptional, async (req, res) => {
+  const agentList = req.user
+    ? await getEffectiveAgents(req.user.id)
+    : agents;
+  const summary = agentList.map((a) => ({
     id: a.id,
     name: a.name,
     title: a.title,
@@ -237,20 +253,42 @@ app.get("/api/agents", (req, res) => {
     tagline: a.tagline,
     expertise: a.expertise,
     capabilities: a.capabilities,
-    taskCount: a.tasks.length,
+    taskCount: (a.tasks || []).length,
+    custom: a.custom || false,
   }));
   res.json(summary);
 });
 
-app.get("/api/agents/:id", (req, res) => {
-  const agent = getAgentById(req.params.id);
+// GET /api/agents/:id — returns a single effective agent (with systemPrompt if authenticated).
+app.get("/api/agents/:id", authOptional, async (req, res) => {
+  const agent = req.user
+    ? await getEffectiveAgent(req.user.id, req.params.id)
+    : getAgentById(req.params.id);
   if (!agent) return res.status(404).json({ error: "Advisor not found" });
   const { systemPrompt, ...publicData } = agent;
-  res.json(publicData);
+  // Include systemPrompt for authenticated users (they may be editing it)
+  if (req.user) {
+    res.json({ ...publicData, systemPrompt });
+  } else {
+    res.json(publicData);
+  }
 });
 
-app.get("/api/tasks", (req, res) => {
-  res.json(getAllTasks());
+app.get("/api/tasks", authOptional, async (req, res) => {
+  if (req.user) {
+    const agentList = await getEffectiveAgents(req.user.id);
+    const allTasks = agentList.map((agent) => ({
+      agentId: agent.id,
+      agentName: agent.name,
+      agentTitle: agent.shortTitle,
+      icon: agent.icon,
+      color: agent.color,
+      tasks: agent.tasks || [],
+    }));
+    res.json(allTasks);
+  } else {
+    res.json(getAllTasks());
+  }
 });
 
 // Chat with an advisor — auth required, user-scoped memory/context
@@ -261,7 +299,7 @@ app.post("/api/chat", authRequired, async (req, res) => {
     return res.status(400).json({ error: "agentId and message are required" });
   }
 
-  const agent = getAgentById(agentId);
+  const agent = await getEffectiveAgent(req.user.id, agentId);
   if (!agent) {
     return res.status(404).json({ error: "Advisor not found" });
   }
@@ -305,6 +343,11 @@ app.post("/api/tasks/run", authRequired, async (req, res) => {
   }
 
   try {
+    const agent = await getEffectiveAgent(req.user.id, agentId);
+    if (!agent) {
+      return res.status(404).json({ error: "Advisor not found" });
+    }
+
     const contextBlock = await buildContext(req.user.id, contextFileIds);
     const memoryBlock = await buildMemoryContext(req.user.id, agentId);
     const fullContext = contextBlock + memoryBlock;
@@ -313,10 +356,84 @@ app.post("/api/tasks/run", authRequired, async (req, res) => {
     const userLLM = {
       complete: (opts) => complete({ ...opts, userId: req.user.id }),
     };
-    const result = await runTask(agentId, taskId, inputs, userLLM, fullContext);
+    const result = await runTask(agentId, taskId, inputs, userLLM, fullContext, agent);
     res.json(result);
   } catch (err) {
     console.error("Task error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Advisor Config Routes (auth required) ---
+
+// GET advisor config overrides for a specific advisor
+app.get("/api/advisors/:id/config", authRequired, async (req, res) => {
+  try {
+    const config = await getAdvisorConfig(req.user.id, req.params.id);
+    res.json(config || {});
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT (save) advisor config overrides
+app.put("/api/advisors/:id/config", authRequired, async (req, res) => {
+  try {
+    const saved = await saveAdvisorConfig(req.user.id, req.params.id, req.body);
+    res.json(saved);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE (reset) advisor config to defaults
+app.delete("/api/advisors/:id/config", authRequired, async (req, res) => {
+  try {
+    await resetAdvisorConfig(req.user.id, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Custom Advisor Routes (auth required) ---
+
+// GET all custom advisors for the user
+app.get("/api/advisors/custom", authRequired, async (req, res) => {
+  try {
+    const custom = await getCustomAdvisors(req.user.id);
+    res.json(custom);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST create a new custom advisor
+app.post("/api/advisors/custom", authRequired, async (req, res) => {
+  try {
+    const created = await createCustomAdvisor(req.user.id, req.body);
+    res.json(created);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT update a custom advisor
+app.put("/api/advisors/custom/:id", authRequired, async (req, res) => {
+  try {
+    const updated = await updateCustomAdvisor(req.user.id, req.params.id, req.body);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE a custom advisor
+app.delete("/api/advisors/custom/:id", authRequired, async (req, res) => {
+  try {
+    const ok = await deleteCustomAdvisor(req.user.id, req.params.id);
+    res.json({ ok });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -413,6 +530,34 @@ app.post("/api/workflows/:id/run", authRequired, async (req, res) => {
     const result = await executeWorkflow(req.params.id, input, userLLM);
     res.json(result);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Simulations (auth required) ---
+
+app.post("/api/simulations/run", authRequired, async (req, res) => {
+  const { scenario, agentIds, synthesizerId } = req.body;
+
+  if (!scenario || !agentIds || agentIds.length === 0) {
+    return res.status(400).json({ error: "scenario and agentIds are required" });
+  }
+
+  try {
+    const effectiveAgents = await getEffectiveAgents(req.user.id);
+    const userLLM = {
+      complete: (opts) => complete({ ...opts, userId: req.user.id }),
+    };
+    const result = await runSimulation({
+      scenario,
+      agentIds,
+      synthesizerId: synthesizerId || agentIds[0],
+      llmClient: userLLM,
+      effectiveAgents,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("Simulation error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });

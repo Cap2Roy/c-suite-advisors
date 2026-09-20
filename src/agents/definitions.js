@@ -721,4 +721,24 @@ You are not a substitute for licensed counsel, but you provide thorough, profess
   },
 ];
 
+/**
+ * Get an agent definition merged with user-specific overrides.
+ * Falls back to the base definition when no override is provided.
+ * @param {string} id - Agent ID
+ * @param {object|null} override - Override fields from advisorConfigStore
+ * @returns {object} Merged agent definition (base + overrides)
+ */
+export function getMergedAgent(id, override = null) {
+  const base = getAgentById(id);
+  if (!base) return null;
+  if (!override) return base;
+  return {
+    ...base,
+    ...override,
+    // Ensure arrays are arrays even if stored as such in Firestore
+    expertise: Array.isArray(override.expertise) ? override.expertise : base.expertise,
+    capabilities: Array.isArray(override.capabilities) ? override.capabilities : base.capabilities,
+  };
+}
+
 export const getAgentById = (id) => agents.find((a) => a.id === id);

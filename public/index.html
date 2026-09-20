@@ -1449,6 +1449,34 @@
     .settings-save-btn:hover { background: var(--accent-hover); }
     .settings-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    /* --- Generic Button Styles --- */
+    .btn {
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-elevated);
+      color: var(--text);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: var(--transition);
+    }
+    .btn:hover { background: var(--bg-hover); border-color: var(--border-light); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-sm { padding: 4px 12px; font-size: 12px; }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border: none;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-danger {
+      background: var(--danger, #ef4444);
+      color: white;
+      border: none;
+    }
+    .btn-danger:hover { filter: brightness(1.1); }
+
     /* --- Memory View --- */
     .memory-section {
       background: var(--bg-card);
@@ -1947,6 +1975,9 @@
         <button class="nav-btn" data-view="reports" onclick="showView('reports')">
           <span class="icon">📑</span> Reports
         </button>
+        <button class="nav-btn" data-view="simulations" onclick="showView('simulations')">
+          <span class="icon">🔬</span> Simulations
+        </button>
         <button class="nav-btn" data-view="knowledge" onclick="showView('knowledge')">
           <span class="icon">📚</span> Knowledge Base
         </button>
@@ -1959,7 +1990,10 @@
       </div>
 
       <div class="nav-section advisor-list">
-        <div class="nav-label">Advisors</div>
+        <div class="nav-label" style="display:flex;justify-content:space-between;align-items:center">
+          Advisors
+          <button class="btn btn-sm" onclick="createNewAdvisor()" style="padding:2px 8px;font-size:11px" title="Add custom advisor">+ Add</button>
+        </div>
         <div id="advisorList"></div>
       </div>
       <div class="user-menu" id="userMenu">
@@ -2119,6 +2153,39 @@
       deletePersonalMemory: (agentId, id) =>
         apiJson(`/api/memory/personal/${agentId}/${id}`, { method: 'DELETE' }),
       getMemoryStats: () => apiJson('/api/memory/stats'),
+      // Advisor configs (CV overrides)
+      getAdvisorConfig: (agentId) => apiJson(`/api/advisors/${agentId}/config`),
+      saveAdvisorConfig: (agentId, config) =>
+        apiJson(`/api/advisors/${agentId}/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        }),
+      resetAdvisorConfig: (agentId) =>
+        apiJson(`/api/advisors/${agentId}/config`, { method: 'DELETE' }),
+      // Custom advisors
+      getCustomAdvisors: () => apiJson('/api/advisors/custom'),
+      createCustomAdvisor: (advisor) =>
+        apiJson('/api/advisors/custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(advisor),
+        }),
+      updateCustomAdvisor: (id, updates) =>
+        apiJson(`/api/advisors/custom/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        }),
+      deleteCustomAdvisor: (id) =>
+        apiJson(`/api/advisors/custom/${id}`, { method: 'DELETE' }),
+      // Simulations
+      runSimulation: (scenario, agentIds, synthesizerId) =>
+        apiJson('/api/simulations/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scenario, agentIds, synthesizerId }),
+        }),
     };
 
     // --- Auth ---
@@ -2393,6 +2460,15 @@
       }
     }
 
+    async function loadAdvisors() {
+      const [agentsRes, tasksRes] = await Promise.all([
+        API.getAgents(), API.getTasks(),
+      ]);
+      advisors = agentsRes;
+      allTasks = tasksRes;
+      renderAdvisorList();
+    }
+
     async function checkMode() {
       try {
         const res = await fetch('/api/health').then(r => r.json());
@@ -2484,6 +2560,8 @@
         renderKnowledgeView();
       } else if (view === 'memory') {
         renderMemoryView();
+      } else if (view === 'simulations') {
+        renderSimulationsView();
       } else if (view === 'settings') {
         renderSettingsView();
       } else if (view === 'advisor-detail') {
@@ -3272,6 +3350,7 @@
             <button class="advisor-tab ${tab === 'tasks' ? 'active' : ''}" onclick="switchAdvisorTab('tasks')">Tasks (${agentTasks.length})</button>
             <button class="advisor-tab ${tab === 'files' ? 'active' : ''}" onclick="switchAdvisorTab('files')">Knowledge (${agentFiles.length})</button>
             <button class="advisor-tab ${tab === 'memory' ? 'active' : ''}" onclick="switchAdvisorTab('memory')">Memory (${(personalMemory[advisor.id] || []).length})</button>
+            <button class="advisor-tab ${tab === 'edit' ? 'active' : ''}" onclick="switchAdvisorTab('edit')">✏️ Edit</button>
           </div>
 
           <div id="advisorTabContent">
@@ -3335,12 +3414,180 @@
           </div>
         `;
       }
+      if (tab === 'edit') {
+        return renderAdvisorEditForm(advisor);
+      }
       return '';
     }
 
-    function switchAdvisorTab(tab) {
+    function renderAdvisorEditForm(advisor) {
+      const isCustom = advisor.custom === true;
+      return `
+        <div class="card">
+          <h3>✏️ Edit Advisor Profile</h3>
+          <p class="text-muted" style="font-size:13px;margin-bottom:16px">
+            ${isCustom
+              ? 'This is a custom advisor. All fields are editable.'
+              : 'Customize this advisor\'s name, expertise, and system prompt. Changes apply only to your account — the default advisor is preserved.'
+            }
+          </p>
+          <div class="advisor-edit-form" id="advisorEditForm">
+            <div class="form-group">
+              <label>Name</label>
+              <input type="text" id="edit-name" value="${escapeHtml(advisor.name || '')}" placeholder="Advisor name">
+            </div>
+            <div class="form-group">
+              <label>Title</label>
+              <input type="text" id="edit-title" value="${escapeHtml(advisor.title || '')}" placeholder="e.g. Chief Strategy Officer">
+            </div>
+            <div class="form-group">
+              <label>Tagline</label>
+              <input type="text" id="edit-tagline" value="${escapeHtml(advisor.tagline || '')}" placeholder="Short one-liner">
+            </div>
+            <div style="display:flex;gap:12px">
+              <div class="form-group" style="flex:0 0 80px">
+                <label>Icon</label>
+                <input type="text" id="edit-icon" value="${escapeHtml(advisor.icon || '🎯')}" style="text-align:center;font-size:18px" maxlength="4">
+              </div>
+              <div class="form-group" style="flex:0 0 100px">
+                <label>Color</label>
+                <input type="color" id="edit-color" value="${advisor.color || '#6366f1'}" style="height:38px;padding:2px">
+              </div>
+              <div class="form-group" style="flex:1">
+                <label>Short Title</label>
+                <input type="text" id="edit-shortTitle" value="${escapeHtml(advisor.shortTitle || '')}" placeholder="e.g. CSO" maxlength="5">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Expertise <span style="font-weight:400;color:var(--text-dim)">(comma-separated)</span></label>
+              <input type="text" id="edit-expertise" value="${(advisor.expertise || []).join(', ')}" placeholder="Strategy, M&A, Board relations">
+            </div>
+            <div class="form-group">
+              <label>Capabilities <span style="font-weight:400;color:var(--text-dim)">(comma-separated)</span></label>
+              <input type="text" id="edit-capabilities" value="${(advisor.capabilities || []).join(', ')}" placeholder="Build strategic plans, Analyze markets">
+            </div>
+            <div class="form-group">
+              <label>System Prompt <span style="font-weight:400;color:var(--text-dim)">(the advisor's CV / personality)</span></label>
+              <textarea id="edit-systemPrompt" rows="12" style="font-family:monospace;font-size:13px;line-height:1.5" placeholder="Define the advisor's personality, background, communication style, and approach...">${escapeHtml(advisor.systemPrompt || '')}</textarea>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button class="btn btn-primary" onclick="saveAdvisorEdit('${advisor.id}', ${isCustom})">💾 Save Changes</button>
+              ${isCustom
+                ? "<button class='btn btn-danger' onclick=\"deleteAdvisor('" + advisor.id + "')\" style='margin-left:auto'>🗑 Delete Advisor</button>"
+                : "<button class='btn' onclick=\"resetAdvisorEdit('" + advisor.id + "')\">↩ Reset to Default</button>"
+              }
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function switchAdvisorTab(tab) {
       currentDetailTab = tab;
-      if (currentDetailAdvisor) renderAdvisorDetail(currentDetailAdvisor);
+      if (!currentDetailAdvisor) return;
+      // For the edit tab, we need systemPrompt which isn't in the summary
+      if (tab === 'edit' && !currentDetailAdvisor.systemPrompt) {
+        try {
+          const full = await apiJson(`/api/agents/${currentDetailAdvisor.id}`);
+          currentDetailAdvisor = { ...currentDetailAdvisor, ...full };
+        } catch {}
+      }
+      renderAdvisorDetail(currentDetailAdvisor);
+    }
+
+    async function saveAdvisorEdit(agentId, isCustom) {
+      const get = (id) => document.getElementById(id)?.value || '';
+      const config = {
+        name: get('edit-name'),
+        title: get('edit-title'),
+        tagline: get('edit-tagline'),
+        icon: get('edit-icon'),
+        color: get('edit-color'),
+        shortTitle: get('edit-shortTitle'),
+        expertise: get('edit-expertise').split(',').map(s => s.trim()).filter(Boolean),
+        capabilities: get('edit-capabilities').split(',').map(s => s.trim()).filter(Boolean),
+        systemPrompt: get('edit-systemPrompt'),
+      };
+      showLoading('Saving advisor profile...');
+      try {
+        if (isCustom) {
+          await API.updateCustomAdvisor(agentId, config);
+        } else {
+          await API.saveAdvisorConfig(agentId, config);
+        }
+        await loadAdvisors();
+        const updated = advisors.find(a => a.id === agentId);
+        if (updated) {
+          currentDetailAdvisor = updated;
+          renderAdvisorDetail(updated);
+        }
+      } catch (err) {
+        alert('Failed to save: ' + err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function resetAdvisorEdit(agentId) {
+      if (!confirm('Reset this advisor to its default profile?')) return;
+      showLoading('Resetting...');
+      try {
+        await API.resetAdvisorConfig(agentId);
+        await loadAdvisors();
+        const updated = advisors.find(a => a.id === agentId);
+        if (updated) {
+          currentDetailAdvisor = updated;
+          renderAdvisorDetail(updated);
+        }
+      } catch (err) {
+        alert('Failed to reset: ' + err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function deleteAdvisor(agentId) {
+      if (!confirm('Delete this custom advisor? This cannot be undone.')) return;
+      showLoading('Deleting advisor...');
+      try {
+        await API.deleteCustomAdvisor(agentId);
+        await loadAdvisors();
+        showView('dashboard');
+      } catch (err) {
+        alert('Failed to delete: ' + err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    async function createNewAdvisor() {
+      const name = prompt('Enter a name for the new advisor:');
+      if (!name) return;
+      showLoading('Creating advisor...');
+      try {
+        await API.createCustomAdvisor({
+          name,
+          title: 'Custom Advisor',
+          shortTitle: name.slice(0, 3).toUpperCase(),
+          icon: '🎯',
+          color: '#6366f1',
+          tagline: 'Custom advisor',
+          expertise: [],
+          capabilities: [],
+          systemPrompt: 'You are ' + name + ', a custom advisor. Define your expertise, background, and approach here.',
+          tasks: [],
+        });
+        await loadAdvisors();
+        const created = advisors.find(a => a.name === name && a.custom);
+        if (created) {
+          showAdvisorDetail(created.id);
+          setTimeout(() => switchAdvisorTab('edit'), 200);
+        }
+      } catch (err) {
+        alert('Failed to create: ' + err.message);
+      } finally {
+        hideLoading();
+      }
     }
 
     function startAdvisorChat(agentId) {
@@ -3445,6 +3692,143 @@
       } catch (err) {
         alert('Delete failed: ' + err.message);
       }
+    }
+
+    // --- Simulations View ---
+    let simSelectedAgents = new Set();
+    let simSynthesizer = null;
+    let simResults = null;
+
+    function renderSimulationsView() {
+      const advisorCheckboxes = advisors.map(a => `
+        <label class="sim-agent-checkbox" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition)">
+          <input type="checkbox" value="${a.id}" onchange="toggleSimAgent('${a.id}', this.checked)" ${simSelectedAgents.has(a.id) ? 'checked' : ''}>
+          <span style="font-size:18px">${a.icon}</span>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">${escapeHtml(a.name)}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${escapeHtml(a.shortTitle)}</div>
+          </div>
+        </label>
+      `).join('');
+
+      const synthOptions = advisors.map(a =>
+        `<option value="${a.id}" ${simSynthesizer === a.id ? 'selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.shortTitle)})</option>`
+      ).join('');
+
+      const resultsHtml = simResults ? renderSimulationResults(simResults) : '';
+
+      const content = `
+        <div class="simulations-view">
+          <div class="dashboard-header">
+            <h2>Business Outcome Simulations</h2>
+            <p>Test business scenarios and simulate outcomes across your executive team. Each advisor analyzes from their functional lens, then a synthesizer produces a unified outcome projection.</p>
+          </div>
+
+          <div class="card" style="margin-bottom:24px">
+            <h3>Scenario</h3>
+            <textarea id="simScenario" rows="5" placeholder="Describe the business scenario to simulate. Example: 'We cut headcount by 20% across all departments to extend runway from 8 to 14 months.' Include key parameters, constraints, and what you want to understand." style="width:100%;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;color:var(--text);font-size:14px;line-height:1.5;resize:vertical"></textarea>
+          </div>
+
+          <div class="card" style="margin-bottom:24px">
+            <h3>Select Advisors</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px">Choose which advisors analyze the scenario. More advisors = richer analysis but longer runtime.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+              ${advisorCheckboxes}
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:24px">
+            <h3>Synthesizer</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:8px">Who synthesizes the team's analyses into a final outcome projection?</p>
+            <select id="simSynthesizer" onchange="simSynthesizer=this.value" style="width:100%;max-width:400px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;color:var(--text);font-size:14px">
+              <option value="">Default (first selected advisor)</option>
+              ${synthOptions}
+            </select>
+          </div>
+
+          <button class="btn btn-primary" id="runSimBtn" onclick="runSimulation()" style="padding:12px 28px;font-size:15px;margin-bottom:24px">
+            ▶ Run Simulation
+          </button>
+
+          <div id="simResults">
+            ${resultsHtml}
+          </div>
+        </div>
+      `;
+      document.getElementById('mainContent').innerHTML = content;
+    }
+
+    function toggleSimAgent(id, checked) {
+      if (checked) simSelectedAgents.add(id);
+      else simSelectedAgents.delete(id);
+    }
+
+    async function runSimulation() {
+      const scenario = document.getElementById('simScenario')?.value.trim();
+      const agentIds = Array.from(simSelectedAgents);
+      const synthesizerId = document.getElementById('simSynthesizer')?.value || null;
+
+      if (!scenario) { alert('Please describe a scenario to simulate.'); return; }
+      if (agentIds.length === 0) { alert('Please select at least one advisor.'); return; }
+
+      simSynthesizer = synthesizerId;
+      const btn = document.getElementById('runSimBtn');
+      btn.disabled = true;
+      btn.textContent = 'Running simulation...';
+      document.getElementById('simResults').innerHTML = `
+        <div class="card" style="text-align:center;padding:40px">
+          <div style="font-size:14px;color:var(--text-muted)">Analyzing scenario across ${agentIds.length} advisor${agentIds.length > 1 ? 's' : ''}...</div>
+        </div>
+      `;
+
+      try {
+        const result = await API.runSimulation(scenario, agentIds, synthesizerId);
+        simResults = result;
+        document.getElementById('simResults').innerHTML = renderSimulationResults(result);
+      } catch (err) {
+        document.getElementById('simResults').innerHTML = `<div class="card" style="color:var(--danger,#ef4444);padding:16px">Error: ${escapeHtml(err.message)}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '▶ Run Simulation';
+      }
+    }
+
+    function renderSimulationResults(result) {
+      const analysesHtml = (result.analyses || []).map(a => `
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <span style="font-size:22px">${a.agentIcon || '🎯'}</span>
+            <div>
+              <div style="font-weight:700;font-size:15px">${escapeHtml(a.agentName)}</div>
+              <div style="font-size:12px;color:var(--text-muted)">${escapeHtml(a.agentTitle)}</div>
+            </div>
+          </div>
+          <div class="sim-analysis-body">${renderMarkdown(a.analysis)}</div>
+        </div>
+      `).join('');
+
+      const synthHtml = result.synthesis ? `
+        <div class="card" style="margin-bottom:16px;border:2px solid var(--accent);border-radius:var(--radius)">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <span style="font-size:22px">🏛️</span>
+            <div>
+              <div style="font-weight:700;font-size:15px">Synthesis — ${escapeHtml(result.synthesis.agentName)}</div>
+              <div style="font-size:12px;color:var(--text-muted)">Unified Outcome Projection</div>
+            </div>
+          </div>
+          <div class="sim-analysis-body">${renderMarkdown(result.synthesis.analysis)}</div>
+        </div>
+      ` : '';
+
+      return `
+        <div class="dashboard-header" style="margin-bottom:20px">
+          <h2>Simulation Results</h2>
+          <p style="color:var(--text-muted);font-size:13px">Scenario: ${escapeHtml(result.scenario)}</p>
+        </div>
+        ${synthHtml}
+        <h3 style="font-size:16px;font-weight:700;margin:24px 0 12px">Individual Advisor Analyses</h3>
+        ${analysesHtml}
+      `;
     }
 
     // --- Memory View ---

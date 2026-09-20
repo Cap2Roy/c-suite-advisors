@@ -45,13 +45,14 @@ Be thorough but concise. This is a real deliverable for a real business decision
  * @param {Object} llmClient - The LLM client instance
  * @returns {Promise<{agent, task, result, timestamp}>}
  */
-export async function runTask(agentId, taskId, inputValues, llmClient, contextBlock = "") {
-  const agent = getAgentById(agentId);
+export async function runTask(agentId, taskId, inputValues, llmClient, contextBlock = "", effectiveAgent = null) {
+  const agent = effectiveAgent || getAgentById(agentId);
   if (!agent) {
     throw new Error(`Unknown advisor: ${agentId}`);
   }
 
-  const task = agent.tasks.find((t) => t.id === taskId);
+  const tasks = agent.tasks || [];
+  const task = tasks.find((t) => t.id === taskId);
   if (!task) {
     throw new Error(`Unknown task for ${agent.shortTitle}: ${taskId}`);
   }
