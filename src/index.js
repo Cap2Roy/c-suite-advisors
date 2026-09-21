@@ -37,7 +37,14 @@ import { workflows, executeWorkflow } from "./services/workflows.js";
 import { runSimulation } from "./services/simulationRunner.js";
 import { searchWeb, formatSearchContext, extractSearchQuery } from "./services/webSearch.js";
 import { SEED_KNOWLEDGE_FILES } from "./services/seedData.js";
-import { getCompanyInfo, saveCompanyInfo, buildCompanyContext } from "./services/companyInfoStore.js";
+import { saveTaskResult, listTaskResults, getTaskResult, deleteTaskResult } from "./services/taskStore.js";
+import {
+  addCompetitor,
+  listCompetitors,
+  updateCompetitor,
+  deleteCompetitor,
+  buildCompetitorContext,
+} from "./services/competitorStore.js";
 import {
   getSettings,
   updateSettings,
@@ -364,6 +371,7 @@ app.post("/api/chat", authRequired, async (req, res) => {
       .join("\n\n");
 
     const companyBlock = await buildCompanyContext(req.user.id);
+    const competitorBlock = await buildCompetitorContext(req.user.id);
     const contextBlock = await buildContext(req.user.id, contextFileIds);
     const memoryBlock = await buildMemoryContext(req.user.id, agentId);
 
@@ -385,7 +393,7 @@ app.post("/api/chat", authRequired, async (req, res) => {
       }
     }
 
-    const prompt = `${companyBlock}${contextBlock}${memoryBlock}${searchBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
+    const prompt = `${companyBlock}${competitorBlock}${contextBlock}${memoryBlock}${searchBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
 
     const systemPrompt = agent.background
       ? `${agent.systemPrompt}\n\n--- Advisor Background ---\n${agent.background}`
@@ -428,6 +436,7 @@ app.post("/api/tasks/run", authRequired, async (req, res) => {
     }
 
     const companyBlock = await buildCompanyContext(req.user.id);
+    const competitorBlock = await buildCompetitorContext(req.user.id);
     const contextBlock = await buildContext(req.user.id, contextFileIds);
     const memoryBlock = await buildMemoryContext(req.user.id, agentId);
 
@@ -447,17 +456,109 @@ app.post("/api/tasks/run", authRequired, async (req, res) => {
         console.error("Web search for task failed:", err.message);
       }
     }
-
-    const fullContext = companyBlock + contextBlock + memoryBlock + searchBlock;
+    const fullContext = companyBlock + competitorBlock + contextBlock + memoryBlock + searchBlock;
 
     // Pass a user-scoped complete function to taskRunner
     const userLLM = {
       complete: (opts) => complete({ ...opts, userId: req.user.id }),
     };
     const result = await runTask(agentId, taskId, inputs, userLLM, fullContext, agent);
+
+    // Persist task result so data survives across runs
+    try {
+      await saveTaskResult(req.user.id, {
+        agentId,
+        agentName: result.agent.name,
+        taskId,
+        taskName: result.task.name,
+        inputs,
+        result: result.result,
+        webSearchUsed: webSearch,
+      });
+    } catch (saveErr) {
+      console.error("Failed to save task result:", saveErr.message);
+    }
+
     res.json(result);
   } catch (err) {
     console.error("Task error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Task History Routes (auth required) ---
+
+// GET all saved task results (metadata + preview)
+app.get("/api/tasks/results", authRequired, async (req, res) => {
+  try {
+    res.json(await listTaskResults(req.user.id));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET a single task result with full content
+app.get("/api/tasks/results/:id", authRequired, async (req, res) => {
+  try {
+    const record = await getTaskResult(req.user.id, req.params.id);
+    if (!record) return res.status(404).json({ error: "Task result not found" });
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE a saved task result
+app.delete("/api/tasks/results/:id", authRequired, async (req, res) => {
+  try {
+    const ok = await deleteTaskResult(req.user.id, req.params.id);
+    if (!ok) return res.status(404).json({ error: "Task result not found" });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Competitor Routes (auth required) ---
+
+// GET all competitors
+app.get("/api/competitors", authRequired, async (req, res) => {
+  try {
+    res.json(await listCompetitors(req.user.id));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST add a competitor
+app.post("/api/competitors", authRequired, async (req, res) => {
+  try {
+    const { name, category, strengths, weaknesses, url, notes } = req.body;
+    if (!name) return res.status(400).json({ error: "name is required" });
+    res.json(await addCompetitor(req.user.id, { name, category, strengths, weaknesses, url, notes }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT update a competitor
+app.put("/api/competitors/:id", authRequired, async (req, res) => {
+  try {
+    const updated = await updateCompetitor(req.user.id, req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: "Competitor not found" });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE a competitor
+app.delete("/api/competitors/:id", authRequired, async (req, res) => {
+  try {
+    const ok = await deleteCompetitor(req.user.id, req.params.id);
+    if (!ok) return res.status(404).json({ error: "Competitor not found" });
+    res.json({ ok: true });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

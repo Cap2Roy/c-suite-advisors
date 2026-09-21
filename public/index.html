@@ -2068,6 +2068,8 @@
     let authToken = null;
     let currentUser = null;
     let webSearchEnabled = false;
+    let taskResults = [];
+    let competitors = [];
 
     // --- Auth helpers ---
     function authHeaders() {
@@ -2219,6 +2221,25 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(info),
         }),
+      // Task Results (history)
+      getTaskResults: () => apiJson('/api/tasks/results'),
+      getTaskResult: (id) => apiJson(`/api/tasks/results/${id}`),
+      deleteTaskResult: (id) => apiJson(`/api/tasks/results/${id}`, { method: 'DELETE' }),
+      // Competitors
+      getCompetitors: () => apiJson('/api/competitors'),
+      addCompetitor: (c) =>
+        apiJson('/api/competitors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(c),
+        }),
+      updateCompetitor: (id, updates) =>
+        apiJson(`/api/competitors/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        }),
+      deleteCompetitor: (id) => apiJson(`/api/competitors/${id}`, { method: 'DELETE' }),
     };
 
     // --- Auth ---
@@ -2476,8 +2497,9 @@
     // --- Init ---
     async function init() {
       try {
-        const [agentsRes, tasksRes, wfRes, kbRes, memRes, companyRes] = await Promise.all([
-          API.getAgents(), API.getTasks(), API.getWorkflows(), API.getKnowledge(), API.getSharedMemory(), API.getCompany()
+        const [agentsRes, tasksRes, wfRes, kbRes, memRes, companyRes, taskResRes, compRes] = await Promise.all([
+          API.getAgents(), API.getTasks(), API.getWorkflows(), API.getKnowledge(), API.getSharedMemory(), API.getCompany(),
+          API.getTaskResults(), API.getCompetitors()
         ]);
         advisors = agentsRes;
         allTasks = tasksRes;
@@ -2485,6 +2507,8 @@
         knowledgeFiles = kbRes;
         sharedMemory = memRes;
         companyInfo = companyRes;
+        taskResults = taskResRes;
+        competitors = compRes;
         renderDashboard();
         renderAdvisorList();
         checkMode();
@@ -2708,6 +2732,249 @@
         alert('Failed to save: ' + err.message);
       }
     }
+
+    // --- Competitor Map (Dashboard) ---
+    function renderCompetitorCard() {
+      if (competitors.length === 0) {
+        return `
+          <div class="card" style="margin-bottom:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border)">
+            <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">🎯 Competitive Landscape</h3>
+            <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">No competitors tracked yet. Add competitors to give your advisors market context.</p>
+            <button class="btn btn-primary" onclick="toggleCompetitorAdd()">+ Add Competitor</button>
+          </div>
+        `;
+      }
+      const rows = competitors.map(c => `
+        <tr>
+          <td style="font-weight:600">${escapeHtml(c.name)}</td>
+          <td>${escapeHtml(c.category || '—')}</td>
+          <td style="font-size:12px;color:var(--text-muted);max-width:200px">${escapeHtml((c.strengths || '').substring(0, 80))}${(c.strengths||'').length > 80 ? '…' : ''}</td>
+          <td style="font-size:12px;color:var(--text-muted);max-width:200px">${escapeHtml((c.weaknesses || '').substring(0, 80))}${(c.weaknesses||'').length > 80 ? '…' : ''}</td>
+          <td>
+            <button class="action-btn" style="padding:4px 8px;font-size:11px" onclick="editCompetitor(${c.id})">✏️</button>
+            <button class="action-btn" style="padding:4px 8px;font-size:11px" onclick="removeCompetitor(${c.id})">🗑️</button>
+          </td>
+        </tr>
+      `).join('');
+      return `
+        <div class="card" style="margin-bottom:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="font-size:16px;font-weight:700">🎯 Competitive Landscape</h3>
+            <button class="btn btn-primary" style="font-size:12px;padding:6px 12px" onclick="toggleCompetitorAdd()">+ Add</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border);text-align:left">
+                  <th style="padding:8px 4px">Competitor</th>
+                  <th style="padding:8px 4px">Category</th>
+                  <th style="padding:8px 4px">Strengths</th>
+                  <th style="padding:8px 4px">Weaknesses</th>
+                  <th style="padding:8px 4px"></th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:12px">Competitor data is injected into all advisor chats and tasks as context.</p>
+        </div>
+      `;
+    }
+
+    function toggleCompetitorAdd() {
+      const card = document.querySelector('.dashboard .card[style*="Competitive"]') || document.querySelector('.dashboard .card');
+      const addHtml = `
+        <div id="competitor-add-form" style="margin-bottom:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+          <h3 style="font-size:14px;font-weight:700;margin-bottom:12px">Add Competitor</h3>
+          <div class="form-group">
+            <label>Name</label>
+            <input id="comp-name" placeholder="e.g. vLLM" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <input id="comp-category" placeholder="e.g. Inference Engine" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+          </div>
+          <div class="form-group">
+            <label>Strengths</label>
+            <textarea id="comp-strengths" placeholder="Key strengths..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:60px"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Weaknesses</label>
+            <textarea id="comp-weaknesses" placeholder="Key weaknesses..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:60px"></textarea>
+          </div>
+          <div class="form-group">
+            <label>URL</label>
+            <input id="comp-url" placeholder="https://..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea id="comp-notes" placeholder="Additional notes..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:50px"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-primary" onclick="saveCompetitorForm()">Save</button>
+            <button class="btn" onclick="renderDashboard()">Cancel</button>
+          </div>
+        </div>
+      `;
+      const existing = document.getElementById('competitor-add-form');
+      if (existing) { renderDashboard(); return; }
+      const grid = document.querySelector('.dashboard .advisor-grid');
+      grid.insertAdjacentHTML('beforebegin', addHtml);
+    }
+
+    async function saveCompetitorForm() {
+      const comp = {
+        name: document.getElementById('comp-name')?.value?.trim() || '',
+        category: document.getElementById('comp-category')?.value?.trim() || '',
+        strengths: document.getElementById('comp-strengths')?.value?.trim() || '',
+        weaknesses: document.getElementById('comp-weaknesses')?.value?.trim() || '',
+        url: document.getElementById('comp-url')?.value?.trim() || '',
+        notes: document.getElementById('comp-notes')?.value?.trim() || '',
+      };
+      if (!comp.name) { alert('Name is required'); return; }
+      showLoading('Saving competitor...');
+      try {
+        await API.addCompetitor(comp);
+        competitors = await API.getCompetitors();
+        hideLoading();
+        renderDashboard();
+      } catch (err) {
+        hideLoading();
+        alert('Failed to save: ' + err.message);
+      }
+    }
+
+    async function editCompetitor(id) {
+      const c = competitors.find(x => x.id === id);
+      if (!c) return;
+      const card = document.querySelector('.dashboard .card[style*="Competitive"]') || document.querySelector('.dashboard .card');
+      const formHtml = `
+        <div id="competitor-edit-form" style="margin-bottom:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+          <h3 style="font-size:14px;font-weight:700;margin-bottom:12px">Edit Competitor</h3>
+          <div class="form-group">
+            <label>Name</label>
+            <input id="comp-name" value="${escapeHtml(c.name)}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <input id="comp-category" value="${escapeHtml(c.category || '')}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+          </div>
+          <div class="form-group">
+            <label>Strengths</label>
+            <textarea id="comp-strengths" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:60px">${escapeHtml(c.strengths || '')}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Weaknesses</label>
+            <textarea id="comp-weaknesses" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:60px">${escapeHtml(c.weaknesses || '')}</textarea>
+          </div>
+          <div class="form-group">
+            <label>URL</label>
+            <input id="comp-url" value="${escapeHtml(c.url || '')}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea id="comp-notes" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:50px">${escapeHtml(c.notes || '')}</textarea>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-primary" onclick="updateCompetitorForm(${c.id})">Update</button>
+            <button class="btn" onclick="renderDashboard()">Cancel</button>
+          </div>
+        </div>
+      `;
+      const grid = document.querySelector('.dashboard .advisor-grid');
+      grid.insertAdjacentHTML('beforebegin', formHtml);
+    }
+
+    async function updateCompetitorForm(id) {
+      const updates = {
+        name: document.getElementById('comp-name')?.value?.trim() || '',
+        category: document.getElementById('comp-category')?.value?.trim() || '',
+        strengths: document.getElementById('comp-strengths')?.value?.trim() || '',
+        weaknesses: document.getElementById('comp-weaknesses')?.value?.trim() || '',
+        url: document.getElementById('comp-url')?.value?.trim() || '',
+        notes: document.getElementById('comp-notes')?.value?.trim() || '',
+      };
+      if (!updates.name) { alert('Name is required'); return; }
+      showLoading('Updating competitor...');
+      try {
+        await API.updateCompetitor(id, updates);
+        competitors = await API.getCompetitors();
+        hideLoading();
+        renderDashboard();
+      } catch (err) {
+        hideLoading();
+        alert('Failed to update: ' + err.message);
+      }
+    }
+
+    async function removeCompetitor(id) {
+      if (!confirm('Delete this competitor?')) return;
+      try {
+        await API.deleteCompetitor(id);
+        competitors = competitors.filter(c => c.id !== id);
+        renderDashboard();
+      } catch (err) {
+        alert('Failed to delete: ' + err.message);
+      }
+    }
+
+    // --- Task History (Dashboard) ---
+    function renderTaskHistoryCard() {
+      if (taskResults.length === 0) return '';
+      const recent = taskResults.slice(0, 5);
+      const rows = recent.map(r => `
+        <tr>
+          <td style="font-weight:600">${escapeHtml(r.taskName || '—')}</td>
+          <td style="font-size:12px">${escapeHtml(r.agentName || '—')}</td>
+          <td style="font-size:11px;color:var(--text-muted)">${new Date(r.ranAt).toLocaleDateString()} ${new Date(r.ranAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
+          <td>
+            <button class="action-btn" style="padding:4px 8px;font-size:11px" onclick="viewTaskResult(${r.id})">View</button>
+            <button class="action-btn" style="padding:4px 8px;font-size:11px" onclick="removeTaskResult(${r.id})">🗑️</button>
+          </td>
+        </tr>
+      `).join('');
+      return `
+        <div class="card" style="margin-bottom:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="font-size:16px;font-weight:700">📋 Recent Task Results</h3>
+            <span style="font-size:12px;color:var(--text-muted)">${taskResults.length} total</span>
+          </div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border);text-align:left">
+                  <th style="padding:8px 4px">Task</th>
+                  <th style="padding:8px 4px">Advisor</th>
+                  <th style="padding:8px 4px">Date</th>
+                  <th style="padding:8px 4px"></th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    async function viewTaskResult(id) {
+      try {
+        const record = await API.getTaskResult(id);
+        showTaskResult(record.taskName, record.result);
+      } catch (err) {
+        alert('Failed to load: ' + err.message);
+      }
+    }
+
+    async function removeTaskResult(id) {
+      if (!confirm('Delete this task result?')) return;
+      try {
+        await API.deleteTaskResult(id);
+        taskResults = taskResults.filter(r => r.id !== id);
+        renderDashboard();
+      } catch (err) {
+        alert('Failed to delete: ' + err.message);
+      }
+    }
     // --- Dashboard ---
     function renderDashboard() {
       const totalTasks = advisors.reduce((sum, a) => sum + a.taskCount, 0);
@@ -2736,11 +3003,21 @@
               <div class="stat-label">Knowledge Files</div>
             </div>
             <div class="stat-card">
+              <div class="stat-value">${taskResults.length}</div>
+              <div class="stat-label">Task Results</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${competitors.length}</div>
+              <div class="stat-label">Competitors</div>
+            </div>
+            <div class="stat-card">
               <div class="stat-value">${capabilities}</div>
               <div class="stat-label">Capabilities</div>
             </div>
           </div>
           ${renderCompanyInfoCard()}
+          ${renderCompetitorCard()}
+          ${renderTaskHistoryCard()}
           <div class="advisor-grid">
             ${advisors.map(a => `
               <div class="advisor-tile" style="--advisor-color: ${a.color}" onclick="showView('chat','${a.id}')">
@@ -3023,6 +3300,8 @@
         const res = await API.runTask(selectedTask.agentId, selectedTask.taskId, inputs, [], useWebSearch);
         hideLoading();
         if (res.error) throw new Error(res.error);
+        // Reload saved task results so the dashboard reflects the new entry
+        try { taskResults = await API.getTaskResults(); } catch (e) {}
         showTaskResult(selectedTask.task.name, res.result);
       } catch (err) {
         hideLoading();
