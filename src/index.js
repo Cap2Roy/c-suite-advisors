@@ -37,6 +37,7 @@ import { workflows, executeWorkflow } from "./services/workflows.js";
 import { runSimulation } from "./services/simulationRunner.js";
 import { searchWeb, formatSearchContext, extractSearchQuery } from "./services/webSearch.js";
 import { SEED_KNOWLEDGE_FILES } from "./services/seedData.js";
+import { getCompanyInfo, saveCompanyInfo, buildCompanyContext } from "./services/companyInfoStore.js";
 import {
   getSettings,
   updateSettings,
@@ -185,6 +186,17 @@ app.post("/api/settings", authRequired, async (req, res) => {
       ? `${updated.apiKey.slice(0, 4)}...${updated.apiKey.slice(-4)}`
       : "",
   });
+});
+
+// --- Company Info Routes (auth required) ---
+
+app.get("/api/company", authRequired, async (req, res) => {
+  res.json(await getCompanyInfo(req.user.id));
+});
+
+app.post("/api/company", authRequired, async (req, res) => {
+  const saved = await saveCompanyInfo(req.user.id, req.body);
+  res.json(saved);
 });
 
 // --- Memory Routes (auth required) ---
@@ -351,6 +363,7 @@ app.post("/api/chat", authRequired, async (req, res) => {
       .map((h) => `${h.role === "user" ? "User" : agent.name}: ${h.content}`)
       .join("\n\n");
 
+    const companyBlock = await buildCompanyContext(req.user.id);
     const contextBlock = await buildContext(req.user.id, contextFileIds);
     const memoryBlock = await buildMemoryContext(req.user.id, agentId);
 
@@ -372,7 +385,7 @@ app.post("/api/chat", authRequired, async (req, res) => {
       }
     }
 
-    const prompt = `${contextBlock}${memoryBlock}${searchBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
+    const prompt = `${companyBlock}${contextBlock}${memoryBlock}${searchBlock}${conversation ? `Previous conversation:\n${conversation}\n\n` : ""}User: ${message}`;
 
     const systemPrompt = agent.background
       ? `${agent.systemPrompt}\n\n--- Advisor Background ---\n${agent.background}`
@@ -414,6 +427,7 @@ app.post("/api/tasks/run", authRequired, async (req, res) => {
       return res.status(404).json({ error: "Advisor not found" });
     }
 
+    const companyBlock = await buildCompanyContext(req.user.id);
     const contextBlock = await buildContext(req.user.id, contextFileIds);
     const memoryBlock = await buildMemoryContext(req.user.id, agentId);
 
@@ -434,7 +448,7 @@ app.post("/api/tasks/run", authRequired, async (req, res) => {
       }
     }
 
-    const fullContext = contextBlock + memoryBlock + searchBlock;
+    const fullContext = companyBlock + contextBlock + memoryBlock + searchBlock;
 
     // Pass a user-scoped complete function to taskRunner
     const userLLM = {

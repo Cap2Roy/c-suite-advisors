@@ -239,6 +239,19 @@
       height: 100vh;
       overflow: hidden;
     }
+    /* All view containers must fill the flex parent and scroll internally */
+    .main > .dashboard,
+    .main > .task-view,
+    .main > .kb-view,
+    .main > .advisor-detail,
+    .main > .workflow-view,
+    .main > .report-view,
+    .main > .simulations-view,
+    .main > .settings-view {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
 
     /* --- Dashboard View --- */
     .dashboard {
@@ -375,11 +388,11 @@
       border: 1px solid var(--border);
     }
 
-    /* --- Chat View --- */
     .chat-view {
       display: flex;
       flex-direction: column;
-      height: 100vh;
+      flex: 1;
+      min-height: 0;
     }
 
     .chat-header {
@@ -765,7 +778,8 @@
     }
 
     .form-group input,
-    .form-group textarea {
+    .form-group textarea,
+    .form-group select {
       width: 100%;
       background: var(--bg-elevated);
       border: 1px solid var(--border);
@@ -778,11 +792,13 @@
     }
 
     .form-group input:focus,
-    .form-group textarea:focus {
+    .form-group textarea:focus,
+    .form-group select:focus {
       outline: none;
       border-color: var(--accent);
       box-shadow: 0 0 0 3px var(--accent-dim);
     }
+
 
     .form-group textarea {
       resize: vertical;
@@ -2037,6 +2053,7 @@
     let allTasks = [];
     let workflows = [];
     let knowledgeFiles = [];
+    let companyInfo = { name: '', industry: '', stage: '', teamSize: '', website: '', description: '', goals: '' };
     let currentView = 'dashboard';
     let currentAdvisor = null;
     let chatHistory = {};
@@ -2193,6 +2210,14 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query, maxResults }),
+        }),
+      // Company Info
+      getCompany: () => apiJson('/api/company'),
+      saveCompany: (info) =>
+        apiJson('/api/company', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(info),
         }),
     };
 
@@ -2451,14 +2476,15 @@
     // --- Init ---
     async function init() {
       try {
-        const [agentsRes, tasksRes, wfRes, kbRes, memRes] = await Promise.all([
-          API.getAgents(), API.getTasks(), API.getWorkflows(), API.getKnowledge(), API.getSharedMemory()
+        const [agentsRes, tasksRes, wfRes, kbRes, memRes, companyRes] = await Promise.all([
+          API.getAgents(), API.getTasks(), API.getWorkflows(), API.getKnowledge(), API.getSharedMemory(), API.getCompany()
         ]);
         advisors = agentsRes;
         allTasks = tasksRes;
         workflows = wfRes;
         knowledgeFiles = kbRes;
         sharedMemory = memRes;
+        companyInfo = companyRes;
         renderDashboard();
         renderAdvisorList();
         checkMode();
@@ -2579,6 +2605,109 @@
       document.getElementById('sidebar').classList.remove('open');
     }
 
+
+    // --- Company Info (Dashboard) ---
+    function renderCompanyInfoCard() {
+      const c = companyInfo;
+      const hasInfo = c.name || c.industry || c.description;
+      if (!hasInfo) {
+        return `
+          <div class="card" style="margin-bottom:24px;padding:20px;border:1px dashed var(--border);background:var(--bg-card)">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <h3 style="font-size:16px;font-weight:700;margin-bottom:4px">🏢 Company Profile</h3>
+                <p style="font-size:13px;color:var(--text-muted)">Tell your advisors about your company so they can tailor advice to your context.</p>
+              </div>
+              <button class="btn" onclick="toggleCompanyEdit()">✏️ Set Up</button>
+            </div>
+          </div>
+        `;
+      }
+      return `
+        <div class="card" style="margin-bottom:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3 style="font-size:16px;font-weight:700">🏢 ${escapeHtml(c.name || 'Company')}</h3>
+            <button class="btn" style="font-size:12px" onclick="toggleCompanyEdit()">✏️ Edit</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;font-size:13px">
+            ${c.industry ? `<div><span style="color:var(--text-dim)">Industry:</span> ${escapeHtml(c.industry)}</div>` : ''}
+            ${c.stage ? `<div><span style="color:var(--text-dim)">Stage:</span> ${escapeHtml(c.stage)}</div>` : ''}
+            ${c.teamSize ? `<div><span style="color:var(--text-dim)">Team:</span> ${escapeHtml(c.teamSize)}</div>` : ''}
+            ${c.website ? `<div><span style="color:var(--text-dim)">Website:</span> ${escapeHtml(c.website)}</div>` : ''}
+          </div>
+          ${c.description ? `<p style="font-size:13px;color:var(--text-muted);margin-top:10px;line-height:1.6">${escapeHtml(c.description)}</p>` : ''}
+          ${c.goals ? `<div style="margin-top:8px;font-size:13px"><span style="color:var(--text-dim)">Goals:</span> ${escapeHtml(c.goals)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    function toggleCompanyEdit() {
+      const card = document.querySelector('.dashboard .card');
+      if (!card) return;
+      const c = companyInfo;
+      card.outerHTML = `
+        <div class="card" style="margin-bottom:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border)">
+          <h3 style="font-size:16px;font-weight:700;margin-bottom:16px">🏢 Company Profile</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label>Company Name</label>
+              <input type="text" id="co-name" value="${escapeHtml(c.name || '')}" placeholder="Acme Inc.">
+            </div>
+            <div class="form-group">
+              <label>Industry</label>
+              <input type="text" id="co-industry" value="${escapeHtml(c.industry || '')}" placeholder="SaaS, fintech, e-commerce...">
+            </div>
+            <div class="form-group">
+              <label>Stage</label>
+              <select id="co-stage">
+                ${['','Idea','Pre-seed','Seed','Series A','Series B','Series C+','Public','Bootstrapped'].map(s => `<option value="${s}" ${c.stage===s?'selected':''}>${s || 'Select...'}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Team Size</label>
+              <input type="text" id="co-teamSize" value="${escapeHtml(c.teamSize || '')}" placeholder="1-10, 11-50, 50+...">
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Website</label>
+              <input type="text" id="co-website" value="${escapeHtml(c.website || '')}" placeholder="https://...">
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Description</label>
+              <textarea id="co-description" rows="3" style="font-size:13px;line-height:1.5" placeholder="What does your company do?">${escapeHtml(c.description || '')}</textarea>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Current Goals</label>
+              <textarea id="co-goals" rows="2" style="font-size:13px;line-height:1.5" placeholder="What are you trying to achieve right now?">${escapeHtml(c.goals || '')}</textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn btn-primary" onclick="saveCompanyInfoForm()">💾 Save</button>
+            <button class="btn" onclick="renderDashboard()">Cancel</button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function saveCompanyInfoForm() {
+      const info = {
+        name: document.getElementById('co-name')?.value?.trim() || '',
+        industry: document.getElementById('co-industry')?.value?.trim() || '',
+        stage: document.getElementById('co-stage')?.value || '',
+        teamSize: document.getElementById('co-teamSize')?.value?.trim() || '',
+        website: document.getElementById('co-website')?.value?.trim() || '',
+        description: document.getElementById('co-description')?.value?.trim() || '',
+        goals: document.getElementById('co-goals')?.value?.trim() || '',
+      };
+      showLoading('Saving company info...');
+      try {
+        companyInfo = await API.saveCompany(info);
+        hideLoading();
+        renderDashboard();
+      } catch (err) {
+        hideLoading();
+        alert('Failed to save: ' + err.message);
+      }
+    }
     // --- Dashboard ---
     function renderDashboard() {
       const totalTasks = advisors.reduce((sum, a) => sum + a.taskCount, 0);
@@ -2611,6 +2740,7 @@
               <div class="stat-label">Capabilities</div>
             </div>
           </div>
+          ${renderCompanyInfoCard()}
           <div class="advisor-grid">
             ${advisors.map(a => `
               <div class="advisor-tile" style="--advisor-color: ${a.color}" onclick="showView('chat','${a.id}')">
