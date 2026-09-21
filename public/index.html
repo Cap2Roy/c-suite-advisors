@@ -2249,6 +2249,12 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, url }),
         }),
+      discoverCompetitors: (description) =>
+        apiJson('/api/competitors/discover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description }),
+        }),
     };
 
     // --- Auth ---
@@ -2749,9 +2755,10 @@
           <div class="card" style="margin-bottom:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border)">
             <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">🎯 Competitive Landscape</h3>
             <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">No competitors tracked yet. Add competitors manually or research one automatically.</p>
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="toggleCompetitorAdd()">+ Add Manually</button>
-              <button class="btn" onclick="toggleCompetitorResearch()">🔍 Auto-Research</button>
+              <button class="btn" onclick="toggleCompetitorDiscover()">🚀 Auto-Discover</button>
+              <button class="btn" onclick="toggleCompetitorResearch()">🔍 Research One</button>
             </div>
           </div>
         `;
@@ -2774,7 +2781,8 @@
         <div class="card" style="margin-bottom:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
             <h3 style="font-size:16px;font-weight:700">🎯 Competitive Landscape</h3>
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn" style="font-size:12px;padding:6px 12px" onclick="toggleCompetitorDiscover()">🚀 Auto-Discover</button>
               <button class="btn" style="font-size:12px;padding:6px 12px" onclick="toggleCompetitorResearch()">🔍 Auto-Research</button>
               <button class="btn btn-primary" style="font-size:12px;padding:6px 12px" onclick="toggleCompetitorAdd()">+ Add</button>
             </div>
@@ -2975,6 +2983,127 @@
       } catch (err) {
         hideLoading();
         alert('Research failed: ' + err.message);
+      }
+    }
+
+    function toggleCompetitorDiscover() {
+      const existing = document.getElementById('competitor-discover-form');
+      if (existing) { renderDashboard(); return; }
+      const formHtml = `
+        <div id="competitor-discover-form" style="margin-bottom:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+          <h3 style="font-size:14px;font-weight:700;margin-bottom:12px">🚀 Auto-Discover Competitors</h3>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Describe your company or product. The AI will search the web and identify your top competitors with strengths, weaknesses, and strategic notes.</p>
+          <div class="form-group">
+            <label>Company / Product Description</label>
+            <textarea id="discover-desc" placeholder="e.g. We build an open-source LLM inference platform for enterprises, focusing on cost-efficient GPU serving and low-latency batched inference." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:80px">${escapeHtml(companyInfo.description || '')}</textarea>
+          </div>
+          <div id="discover-status" style="display:none;margin-bottom:12px;padding:10px;border-radius:6px;background:var(--bg-main);font-size:12px"></div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-primary" id="discover-btn" onclick="discoverCompetitors()">🚀 Discover Competitors</button>
+            <button class="btn" onclick="renderDashboard()">Cancel</button>
+          </div>
+        </div>
+      `;
+      const grid = document.querySelector('.dashboard .advisor-grid');
+      grid.insertAdjacentHTML('beforebegin', formHtml);
+    }
+
+    async function discoverCompetitors() {
+      const desc = document.getElementById('discover-desc')?.value?.trim() || '';
+      if (!desc) { alert('Please describe your company or product'); return; }
+
+      const btn = document.getElementById('discover-btn');
+      const status = document.getElementById('discover-status');
+      btn.disabled = true;
+      btn.textContent = 'Discovering...';
+      status.style.display = 'block';
+      status.style.color = 'var(--text-muted)';
+      status.textContent = 'Searching the web and identifying competitors...';
+
+      try {
+        const results = await API.discoverCompetitors(desc);
+        status.style.color = 'var(--accent)';
+        status.textContent = `Found ${results.length} competitors. Review and select which to add.`;
+
+        if (results.length === 0) {
+          status.style.color = '#dc2626';
+          status.textContent = 'No competitors found. Try a more specific description.';
+          btn.disabled = false;
+          btn.textContent = '🚀 Discover Competitors';
+          return;
+        }
+
+        // Render the results as a checklist
+        const resultRows = results.map((c, i) => `
+          <tr>
+            <td style="padding:6px"><input type="checkbox" id="disc-${i}" checked style="cursor:pointer"></td>
+            <td style="font-weight:600;padding:6px">${escapeHtml(c.name || '')}</td>
+            <td style="padding:6px">${escapeHtml(c.category || '—')}</td>
+            <td style="font-size:12px;color:var(--text-muted);max-width:180px;padding:6px">${escapeHtml((c.strengths || '').substring(0, 60))}${(c.strengths||'').length > 60 ? '…' : ''}</td>
+            <td style="font-size:12px;color:var(--text-muted);max-width:180px;padding:6px">${escapeHtml((c.weaknesses || '').substring(0, 60))}${(c.weaknesses||'').length > 60 ? '…' : ''}</td>
+            <td style="font-size:12px;padding:6px">${c.url ? `<a href="${escapeHtml(c.url)}" target="_blank" style="color:var(--accent)">${escapeHtml(c.url.replace(/^https?:\/\//,'').substring(0,20))}</a>` : '—'}</td>
+          </tr>
+        `).join('');
+
+        const resultsHtml = `
+          <div id="discover-results" style="margin-top:16px">
+            <h4 style="font-size:13px;font-weight:700;margin-bottom:8px">Review & Select Competitors to Add</h4>
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border);text-align:left">
+                    <th style="padding:6px"><input type="checkbox" id="disc-select-all" onclick="document.querySelectorAll('[id^=disc-]').forEach(cb=>{if(cb.id!=='disc-select-all')cb.checked=this.checked})" style="cursor:pointer"></th>
+                    <th style="padding:6px">Name</th>
+                    <th style="padding:6px">Category</th>
+                    <th style="padding:6px">Strengths</th>
+                    <th style="padding:6px">Weaknesses</th>
+                    <th style="padding:6px">URL</th>
+                  </tr>
+                </thead>
+                <tbody>${resultRows}</tbody>
+              </table>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-primary" onclick="saveDiscoveredCompetitors(${JSON.stringify(results).replace(/'/g, '&#39;').replace(/"/g, '&quot;')})">Add Selected</button>
+              <button class="btn" onclick="renderDashboard()">Cancel</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('discover-status').insertAdjacentHTML('afterend', resultsHtml);
+        btn.style.display = 'none';
+      } catch (err) {
+        status.style.color = '#dc2626';
+        status.textContent = 'Discovery failed: ' + err.message;
+        btn.disabled = false;
+        btn.textContent = '🚀 Discover Competitors';
+      }
+    }
+
+    async function saveDiscoveredCompetitors(results) {
+      const selected = [];
+      results.forEach((c, i) => {
+        const cb = document.getElementById(`disc-${i}`);
+        if (cb && cb.checked) selected.push(c);
+      });
+      if (selected.length === 0) { alert('Select at least one competitor to add'); return; }
+      showLoading('Adding ' + selected.length + ' competitors...');
+      try {
+        for (const c of selected) {
+          await API.addCompetitor({
+            name: c.name || '',
+            category: c.category || '',
+            strengths: c.strengths || '',
+            weaknesses: c.weaknesses || '',
+            url: c.url || '',
+            notes: c.notes || '',
+          });
+        }
+        competitors = await API.getCompetitors();
+        hideLoading();
+        renderDashboard();
+      } catch (err) {
+        hideLoading();
+        alert('Failed to add competitors: ' + err.message);
       }
     }
 

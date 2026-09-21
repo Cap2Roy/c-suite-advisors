@@ -636,6 +636,73 @@ Be specific and factual. If information is limited, make reasonable inferences a
   }
 });
 
+// POST discover competitors — web search + LLM generates a list of competitors
+app.post("/api/competitors/discover", authRequired, async (req, res) => {
+  try {
+    const { description } = req.body;
+    if (!description) return res.status(400).json({ error: "description is required" });
+
+    // Step 1: Web search for competitors
+    let searchBlock = "";
+    try {
+      const query = `competitors alternatives similar companies: ${description}`;
+      const searchResult = await searchWeb(query);
+      if (searchResult.results.length > 0) {
+        searchBlock = formatSearchContext(searchResult.results);
+      }
+    } catch (err) {
+      console.error("Competitor discovery web search failed:", err.message);
+    }
+
+    // Step 2: LLM — generate a structured list of competitors
+    const companyBlock = await buildCompanyContext(req.user.id);
+    const prompt = `A user describes their company/product as follows:
+
+"${description}"
+
+${searchBlock ? `Web search results:\n${searchBlock}\n` : "No web search results available. Use your knowledge."}
+
+Based on the above, identify the top 5-10 most relevant competitors or alternatives. For each, provide structured data. Respond in EXACTLY this JSON format (no markdown, no backticks, no preamble):
+
+[
+  {
+    "name": "company name",
+    "category": "one-phrase product/category description",
+    "strengths": "3-5 key strengths, comma-separated",
+    "weaknesses": "3-5 key weaknesses, comma-separated",
+    "url": "company website URL",
+    "notes": "strategic notes: threat level, key observations"
+  }
+]
+
+Be specific and factual. Focus on direct competitors and close alternatives. If information is limited, make reasonable inferences and note them.`;
+
+    const systemPrompt = `You are a competitive intelligence analyst. You identify competitors and produce structured competitive assessments. You always respond in valid JSON array format.`;
+
+    const analysis = await complete({
+      system: systemPrompt,
+      prompt,
+      maxTokens: 2500,
+      userId: req.user.id,
+    });
+
+    // Parse the LLM response as JSON array, with fallback
+    let parsed;
+    try {
+      const cleaned = analysis.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      parsed = JSON.parse(cleaned);
+      if (!Array.isArray(parsed)) parsed = [parsed];
+    } catch (parseErr) {
+      parsed = [];
+    }
+
+    res.json(parsed);
+  } catch (err) {
+    console.error("Competitor discovery error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Advisor Config Routes (auth required) ---
 
 // GET advisor config overrides for a specific advisor
