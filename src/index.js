@@ -564,6 +564,78 @@ app.delete("/api/competitors/:id", authRequired, async (req, res) => {
   }
 });
 
+// POST research a competitor — web search + LLM analysis, returns structured data
+app.post("/api/competitors/research", authRequired, async (req, res) => {
+  try {
+    const { name, url } = req.body;
+    if (!name) return res.status(400).json({ error: "name is required" });
+
+    // Step 1: Web search for the competitor
+    let searchBlock = "";
+    try {
+      const query = `${name} ${url || ""} company product features strengths weaknesses competitors`.trim();
+      const searchResult = await searchWeb(query);
+      if (searchResult.results.length > 0) {
+        searchBlock = formatSearchContext(searchResult.results);
+      }
+    } catch (err) {
+      console.error("Competitor research web search failed:", err.message);
+    }
+
+    // Step 2: LLM analysis — extract structured competitor data from search results
+    const companyBlock = await buildCompanyContext(req.user.id);
+    const competitorBlock = await buildCompetitorContext(req.user.id);
+    const prompt = `Research the competitor "${name}"${url ? ` (website: ${url})` : ""}.
+
+${searchBlock ? `Web search results:\n${searchBlock}\n` : "No web search results available. Use your knowledge."}
+
+Based on the above information and your expertise, provide a structured analysis of this competitor. Respond in EXACTLY this JSON format (no markdown, no backticks, no preamble):
+
+{
+  "name": "${name}",
+  "category": "one-phrase product/category description",
+  "strengths": "3-5 key strengths, comma-separated",
+  "weaknesses": "3-5 key weaknesses, comma-separated",
+  "url": "${url || "best guess URL"}",
+  "notes": "strategic notes: how they compete with us, threat level, key observations"
+}
+
+Be specific and factual. If information is limited, make reasonable inferences and note them.`;
+
+    const systemPrompt = `You are a competitive intelligence analyst. You research companies and produce structured competitive assessments. You always respond in valid JSON format.`;
+
+    const analysis = await complete({
+      system: systemPrompt,
+      prompt,
+      maxTokens: 1000,
+      userId: req.user.id,
+    });
+
+    // Parse the LLM response as JSON, with fallback
+    let parsed;
+    try {
+      // Strip any markdown code fences if present
+      const cleaned = analysis.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      parsed = JSON.parse(cleaned);
+    } catch (parseErr) {
+      // If LLM didn't return valid JSON, return raw text
+      parsed = {
+        name,
+        category: "",
+        strengths: "",
+        weaknesses: "",
+        url: url || "",
+        notes: analysis.substring(0, 500),
+      };
+    }
+
+    res.json(parsed);
+  } catch (err) {
+    console.error("Competitor research error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Advisor Config Routes (auth required) ---
 
 // GET advisor config overrides for a specific advisor

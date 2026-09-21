@@ -2240,6 +2240,12 @@
           body: JSON.stringify(updates),
         }),
       deleteCompetitor: (id) => apiJson(`/api/competitors/${id}`, { method: 'DELETE' }),
+      researchCompetitor: (name, url) =>
+        apiJson('/api/competitors/research', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, url }),
+        }),
     };
 
     // --- Auth ---
@@ -2739,8 +2745,11 @@
         return `
           <div class="card" style="margin-bottom:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border)">
             <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">🎯 Competitive Landscape</h3>
-            <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">No competitors tracked yet. Add competitors to give your advisors market context.</p>
-            <button class="btn btn-primary" onclick="toggleCompetitorAdd()">+ Add Competitor</button>
+            <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">No competitors tracked yet. Add competitors manually or research one automatically.</p>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary" onclick="toggleCompetitorAdd()">+ Add Manually</button>
+              <button class="btn" onclick="toggleCompetitorResearch()">🔍 Auto-Research</button>
+            </div>
           </div>
         `;
       }
@@ -2750,9 +2759,11 @@
           <td>${escapeHtml(c.category || '—')}</td>
           <td style="font-size:12px;color:var(--text-muted);max-width:200px">${escapeHtml((c.strengths || '').substring(0, 80))}${(c.strengths||'').length > 80 ? '…' : ''}</td>
           <td style="font-size:12px;color:var(--text-muted);max-width:200px">${escapeHtml((c.weaknesses || '').substring(0, 80))}${(c.weaknesses||'').length > 80 ? '…' : ''}</td>
-          <td>
-            <button class="action-btn" style="padding:4px 8px;font-size:11px" onclick="editCompetitor(${c.id})">✏️</button>
-            <button class="action-btn" style="padding:4px 8px;font-size:11px" onclick="removeCompetitor(${c.id})">🗑️</button>
+          <td style="font-size:12px">${c.url ? `<a href="${escapeHtml(c.url)}" target="_blank" style="color:var(--accent)">${escapeHtml(c.url.replace(/^https?:\/\//,'').substring(0,25))}${c.url.length > 30 ? '…' : ''}</a>` : '—'}</td>
+          <td style="white-space:nowrap">
+            <button class="action-btn" style="padding:4px 8px;font-size:11px" onclick="researchExistingCompetitor(${c.id})" title="Re-research this competitor">🔍</button>
+            <button class="action-btn" style="padding:4px 8px;font-size:11px" onclick="editCompetitor(${c.id})" title="Edit">✏️</button>
+            <button class="action-btn" style="padding:4px 8px;font-size:11px" onclick="removeCompetitor(${c.id})" title="Delete">🗑️</button>
           </td>
         </tr>
       `).join('');
@@ -2760,7 +2771,10 @@
         <div class="card" style="margin-bottom:24px;padding:20px;background:var(--bg-card);border:1px solid var(--border)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
             <h3 style="font-size:16px;font-weight:700">🎯 Competitive Landscape</h3>
-            <button class="btn btn-primary" style="font-size:12px;padding:6px 12px" onclick="toggleCompetitorAdd()">+ Add</button>
+            <div style="display:flex;gap:8px">
+              <button class="btn" style="font-size:12px;padding:6px 12px" onclick="toggleCompetitorResearch()">🔍 Auto-Research</button>
+              <button class="btn btn-primary" style="font-size:12px;padding:6px 12px" onclick="toggleCompetitorAdd()">+ Add</button>
+            </div>
           </div>
           <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -2770,6 +2784,7 @@
                   <th style="padding:8px 4px">Category</th>
                   <th style="padding:8px 4px">Strengths</th>
                   <th style="padding:8px 4px">Weaknesses</th>
+                  <th style="padding:8px 4px">URL</th>
                   <th style="padding:8px 4px"></th>
                 </tr>
               </thead>
@@ -2780,6 +2795,7 @@
         </div>
       `;
     }
+
 
     function toggleCompetitorAdd() {
       const card = document.querySelector('.dashboard .card[style*="Competitive"]') || document.querySelector('.dashboard .card');
@@ -2841,6 +2857,121 @@
       } catch (err) {
         hideLoading();
         alert('Failed to save: ' + err.message);
+      }
+    }
+
+    function toggleCompetitorResearch() {
+      const existing = document.getElementById('competitor-research-form');
+      if (existing) { renderDashboard(); return; }
+      const formHtml = `
+        <div id="competitor-research-form" style="margin-bottom:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+          <h3 style="font-size:14px;font-weight:700;margin-bottom:12px">🔍 Auto-Research Competitor</h3>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Enter a competitor name (and optionally their URL). The AI will search the web and auto-fill strengths, weaknesses, and strategic notes.</p>
+          <div class="form-group">
+            <label>Competitor Name</label>
+            <input id="research-name" placeholder="e.g. vLLM" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+          </div>
+          <div class="form-group">
+            <label>Website URL (optional)</label>
+            <input id="research-url" placeholder="https://..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+          </div>
+          <div id="research-status" style="display:none;margin-bottom:12px;padding:10px;border-radius:6px;background:var(--bg-main);font-size:12px"></div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-primary" id="research-btn" onclick="researchCompetitor()">🔍 Research & Add</button>
+            <button class="btn" onclick="renderDashboard()">Cancel</button>
+          </div>
+        </div>
+      `;
+      const grid = document.querySelector('.dashboard .advisor-grid');
+      grid.insertAdjacentHTML('beforebegin', formHtml);
+    }
+
+    async function researchCompetitor() {
+      const name = document.getElementById('research-name')?.value?.trim() || '';
+      const url = document.getElementById('research-url')?.value?.trim() || '';
+      if (!name) { alert('Competitor name is required'); return; }
+
+      const btn = document.getElementById('research-btn');
+      const status = document.getElementById('research-status');
+      btn.disabled = true;
+      btn.textContent = 'Researching...';
+      status.style.display = 'block';
+      status.style.color = 'var(--text-muted)';
+      status.textContent = 'Searching the web and analyzing...';
+
+      try {
+        const result = await API.researchCompetitor(name, url);
+        status.style.color = 'var(--accent)';
+        status.textContent = 'Research complete! Review and save.';
+
+        // Replace the research form with a pre-filled add form
+        const data = result;
+        document.getElementById('competitor-research-form')?.remove();
+        const reviewHtml = `
+          <div id="competitor-add-form" style="margin-bottom:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+            <h3 style="font-size:14px;font-weight:700;margin-bottom:4px">Review & Save Competitor</h3>
+            <p style="font-size:12px;color:var(--accent);margin-bottom:12px">✅ Auto-researched — review the fields and edit as needed before saving.</p>
+            <div class="form-group">
+              <label>Name</label>
+              <input id="comp-name" value="${escapeHtml(data.name || name)}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <input id="comp-category" value="${escapeHtml(data.category || '')}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+            </div>
+            <div class="form-group">
+              <label>Strengths</label>
+              <textarea id="comp-strengths" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:60px">${escapeHtml(data.strengths || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>Weaknesses</label>
+              <textarea id="comp-weaknesses" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:60px">${escapeHtml(data.weaknesses || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>URL</label>
+              <input id="comp-url" value="${escapeHtml(data.url || url || '')}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text)">
+            </div>
+            <div class="form-group">
+              <label>Notes</label>
+              <textarea id="comp-notes" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-main);color:var(--text);min-height:50px">${escapeHtml(data.notes || '')}</textarea>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-primary" onclick="saveCompetitorForm()">Save</button>
+              <button class="btn" onclick="renderDashboard()">Cancel</button>
+            </div>
+          </div>
+        `;
+        const grid = document.querySelector('.dashboard .advisor-grid');
+        grid.insertAdjacentHTML('beforebegin', reviewHtml);
+      } catch (err) {
+        status.style.color = '#dc2626';
+        status.textContent = 'Research failed: ' + err.message;
+        btn.disabled = false;
+        btn.textContent = '🔍 Research & Add';
+      }
+    }
+
+    async function researchExistingCompetitor(id) {
+      const c = competitors.find(x => x.id === id);
+      if (!c) return;
+      if (!confirm(`Re-research "${c.name}"? This will update strengths, weaknesses, and notes with fresh web search data.`)) return;
+      showLoading('Researching ' + c.name + '...');
+      try {
+        const result = await API.researchCompetitor(c.name, c.url);
+        await API.updateCompetitor(id, {
+          name: result.name || c.name,
+          category: result.category || c.category,
+          strengths: result.strengths || c.strengths,
+          weaknesses: result.weaknesses || c.weaknesses,
+          url: result.url || c.url,
+          notes: result.notes || c.notes,
+        });
+        competitors = await API.getCompetitors();
+        hideLoading();
+        renderDashboard();
+      } catch (err) {
+        hideLoading();
+        alert('Research failed: ' + err.message);
       }
     }
 
@@ -4439,6 +4570,7 @@
               Memory and knowledge files are injected into advisor prompts automatically.
             </p>
           </div>
+        </div>
       `;
       document.getElementById('mainContent').innerHTML = content;
     }
@@ -4470,22 +4602,7 @@
         btn.textContent = 'Save Settings';
       }
     }
-
-    // --- Helpers ---
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text || '';
-      return div.innerHTML;
-    }
-
-    async function viewFile(id) {
-      try {
-        const file = await apiFetch(`/api/data/${id}`).then(r => r.json());
-        showTaskResult(file.name, file.content);
-      } catch (err) {
-        alert('Failed to load file: ' + err.message);
-      }
-    }
+    // (escapeHtml and viewFile are defined earlier — no duplicates here)
 
   </script>
 </body>
