@@ -1932,6 +1932,9 @@
         </div>
         <button type="submit" class="auth-btn" id="loginBtn">Sign In</button>
         <div class="auth-error" id="loginError"></div>
+        <div class="auth-tos" style="text-align:center;font-size:12px;color:var(--text-muted)">
+          By signing in, you agree to the <a href="#" onclick="showLegalDoc('tos'); return false;">Terms of Service</a> and <a href="#" onclick="showLegalDoc('privacy'); return false;">Privacy Policy</a>
+        </div>
       </form>
       <form id="registerForm" onsubmit="handleRegister(event)" style="display:none">
         <div class="auth-field">
