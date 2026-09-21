@@ -37,6 +37,7 @@ import { workflows, executeWorkflow } from "./services/workflows.js";
 import { runSimulation } from "./services/simulationRunner.js";
 import { searchWeb, formatSearchContext, extractSearchQuery } from "./services/webSearch.js";
 import { SEED_KNOWLEDGE_FILES } from "./services/seedData.js";
+import { getCompanyInfo, saveCompanyInfo, buildCompanyContext } from "./services/companyInfoStore.js";
 import { saveTaskResult, listTaskResults, getTaskResult, deleteTaskResult } from "./services/taskStore.js";
 import {
   addCompetitor,
